@@ -382,12 +382,18 @@ def model_evaluation(inputs):  # Evaluates the model
     x = kwargs["scaler"].inverse_transform(x)
     x_eval = expand_x_for_model_eval(x, kwargs)
     try:
-        return np.array(
-            kwargs["opt_sign"] * hpp_m.evaluate(*x_eval[0, :])[kwargs["op_var_index"]]
-        )
-    except:
+        value = kwargs["opt_sign"] * hpp_m.evaluate(*x_eval[0, :])[kwargs["op_var_index"]]
+        if value is None:
+            raise ValueError("Objective evaluation returned None")
+        value = float(value)
+        if not np.isfinite(value):
+            raise ValueError(f"Objective evaluation returned non-finite value: {value}")
+        return value
+    except Exception as exc:
         print("There was an error with this case (or potentially memory error): ")
         print("x=[" + ", ".join(map(str, x_eval[0, :])) + "]")
+        print(f"Error detail: {exc}")
+        return np.nan
 
 
 class ParallelEvaluator(Evaluator):
@@ -463,6 +469,19 @@ class EfficientGlobalOptimizationDriver(Driver):
         """
         for k, v in self.kwargs.items():
             self.options.declare(k, v)
+
+    @staticmethod
+    def _filter_invalid_observations(x, y, stage_name):
+        valid_mask = np.isfinite(y[:, 0])
+        n_invalid = int((~valid_mask).sum())
+        if n_invalid > 0:
+            print(f"Discarded {n_invalid} invalid simulation(s) during {stage_name}.")
+        if not np.any(valid_mask):
+            raise RuntimeError(
+                f"All simulations failed during {stage_name}. "
+                "Try narrowing variable bounds or checking model inputs."
+            )
+        return x[valid_mask, :], y[valid_mask, :]
 
     def run(self):
         kwargs = self.kwargs
@@ -553,6 +572,9 @@ class EfficientGlobalOptimizationDriver(Driver):
         n_procs = kwargs["n_procs"]
         PE = ParallelEvaluator(n_procs=n_procs)
         ydoe = PE.run_ydoe(fun=model_evaluation, x=xdoe, **kwargs)
+        xdoe, ydoe = self._filter_invalid_observations(
+            xdoe, ydoe, stage_name="initial DOE"
+        )
 
         lapse = np.round((time.time() - start) / 60, 2)
         print(f"Initial {xdoe.shape[0]} simulations took {lapse} minutes")
@@ -636,6 +658,9 @@ class EfficientGlobalOptimizationDriver(Driver):
             # run model at all candidate points
             start = time.time()
             yopt_iter = PE.run_ydoe(fun=model_evaluation, x=xopt_iter, **kwargs)
+            xopt_iter, yopt_iter = self._filter_invalid_observations(
+                xopt_iter, yopt_iter, stage_name=f"iteration {itr + 1} candidate evaluation"
+            )
 
             lapse = np.round((time.time() - start) / 60, 2)
             print(
@@ -645,6 +670,9 @@ class EfficientGlobalOptimizationDriver(Driver):
             # update the db of model evaluations, xdoe and ydoe
             xdoe_upd, ydoe_upd = concat_to_existing(xdoe, ydoe, xopt_iter, yopt_iter)
             xdoe_upd, ydoe_upd = drop_duplicates(xdoe_upd, ydoe_upd)
+            xdoe_upd, ydoe_upd = self._filter_invalid_observations(
+                xdoe_upd, ydoe_upd, stage_name=f"iteration {itr + 1} database update"
+            )
 
             # Drop yopt if it is not better than best design seen
             xopt = xdoe_upd[[np.argmin(ydoe_upd)], :]

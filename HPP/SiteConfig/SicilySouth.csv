@@ -1,0 +1,55 @@
+,SicilySouth
+clearance [m],27.0
+sp [W/m2],343.0
+p_rated [MW],15.0
+Nwt,0.0
+wind_MW_per_km2 [MW/km2],6.1419999999999995
+solar_MW [MW],600.0
+surface_tilt [deg],10.273100000000001
+surface_azimuth [deg],180.0
+DC_AC_ratio,1.0
+b_P [MW],0.0
+b_E_h [h],2.0
+cost_of_battery_P_fluct_in_peak_price_ratio,2.5700000000000003
+name,SicilySouth
+longitude,13.21
+latitude,37.159
+altitude,100
+NPV_over_CAPEX,-0.9506472828608321
+NPV [MEuro],-618.015798587827
+IRR,0.0
+LCOE [Euro/MWh],60.52679350011362
+Revenues [MEuro],8.059355715116679
+CAPEX [MEuro],650.1
+OPEX [MEuro],5.7
+Wind CAPEX [MEuro],0.0
+Wind OPEX [MEuro],0.0
+PV CAPEX [MEuro],336.6
+PV OPEX [MEuro],5.7
+Batt CAPEX [MEuro],0.0
+Batt OPEX [MEuro],0.0
+Shared CAPEX [MEuro],313.5
+Shared OPEX [MEuro],0.0
+penalty lifetime [MEuro],0.0
+Mean Annual Electricity Sold [GWh],868.8366560846576
+GUF,0.19836453335266158
+grid [MW],500.0
+wind [MW],0.0
+solar [MW],600.0
+Battery Energy [MWh],0.0
+Battery Power [MW],0.0
+Total curtailment [GWh],0.0040000000000006255
+Total curtailment with deg [GWh],0.0
+Awpp [km2],0.0
+Apvp [km2],0.12000000000000001
+Plant area [km2],0.12000000000000001
+Rotor diam [m],235.96828103188196
+Hub height [m],144.98414051594096
+Number of batteries used in lifetime,0.0
+Break-even PPA price [Euro/MWh],62.684490911427275
+Capacity factor wind [-],
+AEP [GWh],926.6635800000001
+AEP with degradation [GWh],868.8366560846576
+design obj,NPV_over_CAPEX
+opt time [min],8.62
+n_model_evals,122

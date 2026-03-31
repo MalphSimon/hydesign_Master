@@ -40,6 +40,30 @@ from hydesign.wind.wind import wpp_comp as wpp
 from hydesign.wind.wind import wpp_with_degradation_comp as wpp_with_degradation
 
 
+def _ensure_datetime_index(df, source_label):
+    if isinstance(df.index, pd.DatetimeIndex):
+        return df
+
+    idx_dayfirst = pd.to_datetime(df.index, errors="coerce", dayfirst=True)
+    idx_monthfirst = pd.to_datetime(df.index, errors="coerce", dayfirst=False)
+
+    if idx_dayfirst.notna().sum() >= idx_monthfirst.notna().sum():
+        idx = idx_dayfirst
+    else:
+        idx = idx_monthfirst
+
+    if idx.isna().any():
+        n_invalid = int(idx.isna().sum())
+        raise ValueError(
+            f"Failed to parse {n_invalid} datetime value(s) in weather index from {source_label}."
+        )
+
+    out = df.copy()
+    out.index = pd.DatetimeIndex(idx)
+    out = out.sort_index()
+    return out
+
+
 class hpp_base:
     def __init__(self, sim_pars_fn, defaults={}, **kwargs):
         self.sim_pars_fn = sim_pars_fn
@@ -167,7 +191,15 @@ class hpp_base:
             N_time = len(weather)
 
         else:  # User provided weather timeseries
-            weather = pd.read_csv(input_ts_fn, index_col=0, parse_dates=True)
+            # Auto-detect delimiter to support both comma- and semicolon-separated files.
+            weather = pd.read_csv(
+                input_ts_fn,
+                index_col=0,
+                parse_dates=True,
+                sep=None,
+                engine="python",
+            )
+            weather = _ensure_datetime_index(weather, input_ts_fn)
             N_time = len(weather)
 
         # Check for complete years in the input_ts
@@ -184,6 +216,18 @@ class hpp_base:
             print(f"The file has been modified and stored in {input_ts_fn}")
             weather.to_csv(input_ts_fn)
             N_time = len(weather)
+
+        # Accept case-insensitive price column names from user-provided inputs.
+        if "Price" not in weather.columns:
+            price_cols = [
+                col for col in weather.columns if str(col).strip().lower() == "price"
+            ]
+            if price_cols:
+                weather["Price"] = weather[price_cols[0]]
+            else:
+                raise KeyError(
+                    "Missing price column in weather input. Expected 'Price' (or case-insensitive 'price')."
+                )
 
         # Assign PPA to the full input_ts
         if ppa_price is None:

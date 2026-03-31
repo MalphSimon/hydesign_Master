@@ -1,0 +1,7 @@
+Site Code,Site Name,Number of WT,Wind Capacity [MW],Solar Capacity [MW],DC AC ratio,Battery Power [MW],Battery Energy [h]
+IT,SicilySouth,0,0,600,1.0,0,2
+FR(S),Golfe_du_Lion,33,495,24,1.15,0,4
+FR(W),Sud_Atlantique,32,480,43,1.0,0,8
+TH,Thetys,27,405,643,1.0,1,1
+DK,NordsoenMidt,32,480,5,1.07,0,1
+NO,Vestavind,33,495,2,1.12,0,3

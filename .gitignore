@@ -40,3 +40,4 @@ test_pip_install/
 *.out
 docs/_tags/*
 hydesign/tests/test_files/tmp/*
+*.nc

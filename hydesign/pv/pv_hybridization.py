@@ -244,7 +244,13 @@ class existing_pvp:
             latitude=latitude, longitude=longitude, altitude=altitude, name="Plant"
         )
 
-        weather = pd.read_csv(weather_fn, index_col=0, parse_dates=True)
+        weather = pd.read_csv(
+            weather_fn,
+            index_col=0,
+            parse_dates=True,
+            sep=None,
+            engine="python",
+        )
 
         weather["temp_air"] = weather["temp_air_1"] - 273.15  # Celcium
         weather["wind_speed"] = weather["WS_1"]

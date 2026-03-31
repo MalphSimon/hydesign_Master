@@ -1,0 +1,2 @@
+name,site_config_file,NPV_over_CAPEX,NPV [MEuro],LCOE [Euro/MWh],wind [MW],solar [MW],solar_cf,status,retry_used
+Thetys,c:\Users\malth\HPP\hydesign\HPP\SiteConfig\Thetys.csv,-0.7988415936391144,-1153.4308018426773,57.684465000477914,465.0,634.0,0.12436270547945204,ok,False

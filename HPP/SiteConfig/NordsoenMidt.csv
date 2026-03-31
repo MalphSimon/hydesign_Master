@@ -1,0 +1,55 @@
+,NordsoenMidt
+clearance [m],27.0
+sp [W/m2],343.0
+p_rated [MW],15.0
+Nwt,32.0
+wind_MW_per_km2 [MW/km2],5.0404
+solar_MW [MW],5.0
+surface_tilt [deg],5.7273000000000005
+surface_azimuth [deg],180.0
+DC_AC_ratio,1.06535
+b_P [MW],0.0
+b_E_h [h],1.0
+cost_of_battery_P_fluct_in_peak_price_ratio,11.174
+name,NordsoenMidt
+longitude,7.5329
+latitude,56.0219
+altitude,100
+NPV_over_CAPEX,-0.613629940961204
+NPV [MEuro],-712.4743131709741
+IRR,0.0
+LCOE [Euro/MWh],45.79388017481949
+Revenues [MEuro],69.15544571730423
+CAPEX [MEuro],1161.0814036468591
+OPEX [MEuro],32.99608761375096
+Wind CAPEX [MEuro],844.5999586468591
+Wind OPEX [MEuro],32.94548348875096
+PV CAPEX [MEuro],2.981445
+PV OPEX [MEuro],0.050604125
+Batt CAPEX [MEuro],0.0
+Batt OPEX [MEuro],0.0
+Shared CAPEX [MEuro],313.5
+Shared OPEX [MEuro],0.0
+penalty lifetime [MEuro],0.0
+Mean Annual Electricity Sold [GWh],2686.4466624624056
+GUF,0.6133439868635628
+grid [MW],500.0
+wind [MW],480.0
+solar [MW],5.0
+Battery Energy [MWh],0.0
+Battery Power [MW],0.0
+Total curtailment [GWh],0.0
+Total curtailment with deg [GWh],0.0
+Awpp [km2],95.2305372589477
+Apvp [km2],0.08
+Plant area [km2],95.2305372589477
+Rotor diam [m],235.96828103188196
+Hub height [m],144.98414051594096
+Number of batteries used in lifetime,0.0
+Break-even PPA price [Euro/MWh],47.11926479569895
+Capacity factor wind [-],0.6377272475097547
+AEP [GWh],2686.7741733290163
+AEP with degradation [GWh],2686.446662462406
+design obj,NPV_over_CAPEX
+opt time [min],9.4
+n_model_evals,127

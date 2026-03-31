@@ -19,6 +19,30 @@ from pvlib.temperature import TEMPERATURE_MODEL_PARAMETERS
 from hydesign.openmdao_wrapper import ComponentWrapper
 
 
+def _ensure_datetime_index(df, source_label):
+    if isinstance(df.index, pd.DatetimeIndex):
+        return df
+
+    idx_dayfirst = pd.to_datetime(df.index, errors="coerce", dayfirst=True)
+    idx_monthfirst = pd.to_datetime(df.index, errors="coerce", dayfirst=False)
+
+    if idx_dayfirst.notna().sum() >= idx_monthfirst.notna().sum():
+        idx = idx_dayfirst
+    else:
+        idx = idx_monthfirst
+
+    if idx.isna().any():
+        n_invalid = int(idx.isna().sum())
+        raise ValueError(
+            f"Failed to parse {n_invalid} datetime value(s) in weather index from {source_label}."
+        )
+
+    out = df.copy()
+    out.index = pd.DatetimeIndex(idx)
+    out = out.sort_index()
+    return out
+
+
 class pvp:
     """Pure Python PV power plant model : It computes the solar power output during the lifetime of the plant using solar plant AC capacity, DC/AC ratio, location coordinates and PV module angles"""
 
@@ -45,7 +69,14 @@ class pvp:
             latitude=latitude, longitude=longitude, altitude=altitude, name="Plant"
         )
 
-        weather = pd.read_csv(weather_fn, index_col=0, parse_dates=True)
+        weather = pd.read_csv(
+            weather_fn,
+            index_col=0,
+            parse_dates=True,
+            sep=None,
+            engine="python",
+        )
+        weather = _ensure_datetime_index(weather, weather_fn)
 
         weather = weather.rename(
             columns={

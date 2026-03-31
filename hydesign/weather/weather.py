@@ -38,7 +38,13 @@ class ABL:
 
     def __init__(self, weather_fn, N_time, interpolate_wd=False):
         self.N_time = N_time
-        self.weather = pd.read_csv(weather_fn, index_col=0, parse_dates=True)
+        self.weather = pd.read_csv(
+            weather_fn,
+            index_col=0,
+            parse_dates=True,
+            sep=None,
+            engine="python",
+        )
         self.interpolate_wd = interpolate_wd
 
     def precompute(self, hh):

@@ -58,7 +58,13 @@ class battery_degradation:
         self.battery_deg = battery_deg
         self.battery_rf_matrix = None
 
-        weather = pd.read_csv(weather_fn, index_col=0, parse_dates=True)
+        weather = pd.read_csv(
+            weather_fn,
+            index_col=0,
+            parse_dates=True,
+            sep=None,
+            engine="python",
+        )
 
         air_temp_K_t = expand_to_lifetime(
             weather.temp_air_1.values,
@@ -189,7 +195,13 @@ class battery_loss_in_capacity_due_to_temp:
         self.weather_fn = weather_fn
         self.battery_deg = battery_deg
 
-        weather = pd.read_csv(weather_fn, index_col=0, parse_dates=True)
+        weather = pd.read_csv(
+            weather_fn,
+            index_col=0,
+            parse_dates=True,
+            sep=None,
+            engine="python",
+        )
 
         air_temp_C_t = expand_to_lifetime(
             (weather.temp_air_1 - 273.15).values,

@@ -1,0 +1,55 @@
+,Vestavind
+clearance [m],27.0
+sp [W/m2],343.0
+p_rated [MW],15.0
+Nwt,33.0
+wind_MW_per_km2 [MW/km2],5.0
+solar_MW [MW],2.0
+surface_tilt [deg],15.4513
+surface_azimuth [deg],180.0
+DC_AC_ratio,1.12315
+b_P [MW],0.0
+b_E_h [h],3.0
+cost_of_battery_P_fluct_in_peak_price_ratio,14.102
+name,Vestavind
+longitude,4.484
+latitude,60.337
+altitude,100
+NPV_over_CAPEX,-0.7953415608725903
+NPV [MEuro],-943.0752293007259
+IRR,0.0
+LCOE [Euro/MWh],56.56781218184058
+Revenues [MEuro],50.979870419187826
+CAPEX [MEuro],1185.7487093545735
+OPEX [MEuro],31.412388920057023
+Wind CAPEX [MEuro],870.9937073545735
+Wind OPEX [MEuro],31.39104907005702
+PV CAPEX [MEuro],1.255002
+PV OPEX [MEuro],0.02133985
+Batt CAPEX [MEuro],0.0
+Batt OPEX [MEuro],0.0
+Shared CAPEX [MEuro],313.5
+Shared OPEX [MEuro],0.0
+penalty lifetime [MEuro],0.0
+Mean Annual Electricity Sold [GWh],2181.1597431872506
+GUF,0.49798167652676956
+grid [MW],500.0
+wind [MW],495.0
+solar [MW],2.0
+Battery Energy [MWh],0.0
+Battery Power [MW],0.0
+Total curtailment [GWh],0.0
+Total curtailment with deg [GWh],0.0
+Awpp [km2],99.0
+Apvp [km2],0.032
+Plant area [km2],99.0
+Rotor diam [m],235.96828103188196
+Hub height [m],144.98414051594096
+Number of batteries used in lifetime,0.0
+Break-even PPA price [Euro/MWh],58.23651108190556
+Capacity factor wind [-],0.5026004811498861
+AEP [GWh],2181.278361362136
+AEP with degradation [GWh],2181.159743187251
+design obj,NPV_over_CAPEX
+opt time [min],9.07
+n_model_evals,126
