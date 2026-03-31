@@ -145,7 +145,7 @@ def compare_yearly_evaluations(site_names, eval_dir=None):
 	plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 
 	# Save the plot
-	save_path = r"C:\Users\malth\HPP\hydesign\HPP\HPPCompares.png"
+	save_path = r"C:\Users\malth\HPP\hydesign\HPP\HPPCompares\HPPEvalCompare.png"
 	plt.savefig(save_path, dpi=300)
 	print(f"Plot saved to {save_path}")
 	

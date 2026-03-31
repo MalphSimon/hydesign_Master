@@ -356,11 +356,11 @@ def main():
     _init_local_hydesign_imports()
 
     parser = argparse.ArgumentParser(description="Evaluate site designs.")
-    parser.add_argument("--site", nargs='+', default=["Golfe_du_Lion"])
+    parser.add_argument("--site", nargs='+', default=["Golfe_du_Lion","NordsoenMidt", "Thetys", "Sud_Atlantique", "Vestavind", "SicilySouth"])
     parser.add_argument("--list-sites", action="store_true")
     parser.add_argument("--start-year", type=int, default=1982)
-    parser.add_argument("--end-year", type=int, default=1982)
-    parser.add_argument("--lifetime-years", type=int, default=1)
+    parser.add_argument("--end-year", type=int, default=2015)
+    parser.add_argument("--lifetime-years", type=int, default=25)
     parser.add_argument("--output-csv", default=None)
     args = parser.parse_args()
 
