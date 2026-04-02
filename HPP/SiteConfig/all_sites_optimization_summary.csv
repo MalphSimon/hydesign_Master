@@ -1,2 +1,0 @@
-name,site_config_file,NPV_over_CAPEX,NPV [MEuro],LCOE [Euro/MWh],wind [MW],solar [MW],solar_cf,status,retry_used
-Sud_Atlantique_Wind,c:\Users\malth\HPP\hydesign\HPP\SiteConfig\Sud_Atlantique_Wind.csv,-0.8194759937689315,-970.6641579474351,68.09162315476287,495.0,0.0,0.12935569634703195,ok,False

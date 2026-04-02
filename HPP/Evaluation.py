@@ -11,24 +11,29 @@ import tempfile
 
 import numpy as np
 import pandas as pd
-from Bankability import calculate_bankability_metrics
 from joblib import Parallel, delayed
 
 hpp_model = None
 examples_filepath = None
+calculate_bankability_metrics = None
 
 
 def _init_local_hydesign_imports():
     global hpp_model
     global examples_filepath
+    global calculate_bankability_metrics
 
     repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if repo_root not in sys.path:
         sys.path.insert(0, repo_root)
 
+    from HPP.HelperFunctions.Bankability import (
+        calculate_bankability_metrics as local_calculate_bankability_metrics,
+    )
     from hydesign.assembly.hpp_assembly import hpp_model as local_hpp_model
     from hydesign.examples import examples_filepath as local_examples_filepath
 
+    calculate_bankability_metrics = local_calculate_bankability_metrics
     hpp_model = local_hpp_model
     examples_filepath = local_examples_filepath
 
@@ -279,6 +284,8 @@ def _extract_mean_annual_generation(hpp, lifetime_years, solar_capacity_mw, year
 
 def evaluate_single_year(year, site_name, latitude, longitude, altitude, sim_pars_fn, 
                          design_x, design, yearly_groups, lifetime_years, temp_dir, price_add):
+    if hpp_model is None or examples_filepath is None or calculate_bankability_metrics is None:
+        _init_local_hydesign_imports()
     
     year_df = _normalize_year_8760(yearly_groups.get(year, pd.DataFrame()), year)
 
@@ -373,8 +380,8 @@ def main():
     parser.add_argument("--site", nargs='+', default=["Golfe_du_Lion", "SicilySouth", "Sud_Atlantique", "Sud_Atlantique_Wind", "Thetys", "NordsoenMidt", "Vestavind"],)
     parser.add_argument("--list-sites", action="store_true")
     parser.add_argument("--start-year", type=int, default=1982)
-    parser.add_argument("--end-year", type=int, default=2015)
-    parser.add_argument("--lifetime-years", type=int, default=25)
+    parser.add_argument("--end-year", type=int, default=1982)
+    parser.add_argument("--lifetime-years", type=int, default=1)
     parser.add_argument("--output-csv", default=None)
     parser.add_argument("--price-add", type=float, default=DEFAULT_PRICE_ADD, 
                         help=f"Price offset in Eur/MWh (Default: {DEFAULT_PRICE_ADD})")
