@@ -154,4 +154,8 @@ def compare_yearly_evaluations(site_names, eval_dir=None):
 compare_yearly_evaluations([
      "Golfe_du_Lion",
      "NordsoenMidt",
+	 "SicilySouth",
+	 "Sud_Atlantique",
+	 "Thetys",
+	 "Vestavind"
  ])

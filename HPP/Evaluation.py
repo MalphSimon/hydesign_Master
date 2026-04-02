@@ -1,8 +1,6 @@
-"""Evaluation of HPPs using site-specific configuration files.
-
-Usage examples:
-    python HPP/Evaluation.py --site NordsoenMidt
-    python HPP/Evaluation.py --list-sites
+"""
+Evaluation of HPPs using site-specific configuration files.
+The script evaluates the performance of a site design across multiple weather years, calculating key metrics and optionally applying a price offset to simulate different market conditions. The results are saved in CSV format for further analysis and visualization.
 """
 
 import argparse
@@ -279,8 +277,17 @@ def _extract_mean_annual_generation(hpp, lifetime_years, solar_capacity_mw, year
     }
 
 
-def evaluate_single_year(year, site_name, latitude, longitude, altitude, sim_pars_fn, design_x, design, yearly_groups, lifetime_years, temp_dir):
+def evaluate_single_year(year, site_name, latitude, longitude, altitude, sim_pars_fn, 
+                         design_x, design, yearly_groups, lifetime_years, temp_dir, price_add):
+    
     year_df = _normalize_year_8760(yearly_groups.get(year, pd.DataFrame()), year)
+
+    # Apply Price Increase
+    if price_add != 0:
+        price_cols = [col for col in year_df.columns if 'price' in col.lower()]
+        for col in price_cols:
+            year_df[col] = year_df[col] + price_add
+
     lifetime_df = _repeat_year_to_lifetime(year_df, year, lifetime_years)
 
     year_input_ts_fn = os.path.join(temp_dir, f"input_ts_{site_name}_{year}_x{lifetime_years}.csv")
@@ -303,6 +310,7 @@ def evaluate_single_year(year, site_name, latitude, longitude, altitude, sim_par
         "site": site_name,
         "weather_year": year,
         "lifetime_years": lifetime_years,
+        "price_added": price_add,
         "input_rows_per_year": len(year_df),
         "input_rows_lifetime": len(lifetime_df)
     })
@@ -321,19 +329,21 @@ def evaluate_single_year(year, site_name, latitude, longitude, altitude, sim_par
             "solar_t": solar_t[:len(year_df)]
         })
 
-    print(f"Evaluated weather year {year} with lifetime={lifetime_years} years")
+    print(f"Evaluated year {year} (Price offset: +{price_add})")
     return row, hourly_df
 
 
-def evaluate_yearly_lifetime(site_name, latitude, longitude, altitude, sim_pars_fn, input_ts_fn, design, start_year, end_year, lifetime_years):
+def evaluate_yearly_lifetime(site_name, latitude, longitude, altitude, sim_pars_fn, 
+                             input_ts_fn, design, start_year, end_year, lifetime_years, price_add):
     design_x = _build_design_vector(design)
     input_ts = _read_input_ts(input_ts_fn)
     yearly_groups = {year: group for year, group in input_ts.groupby(input_ts.index.year)}
 
     with tempfile.TemporaryDirectory(prefix=f"hpp_eval_{site_name}_") as temp_dir:
-        results = Parallel(n_jobs=16)(
+        results = Parallel(n_jobs=-1, verbose=10)(
             delayed(evaluate_single_year)(
-                year, site_name, latitude, longitude, altitude, sim_pars_fn, design_x, design, yearly_groups, lifetime_years, temp_dir
+                year, site_name, latitude, longitude, altitude, sim_pars_fn, 
+                design_x, design, yearly_groups, lifetime_years, temp_dir, price_add
             )
             for year in range(start_year, end_year + 1)
         )
@@ -355,13 +365,19 @@ def evaluate_yearly_lifetime(site_name, latitude, longitude, altitude, sim_pars_
 def main():
     _init_local_hydesign_imports()
 
+    # --- CHANGE THIS VALUE TO ADJUST PRICE PERMANENTLY IN CODE ---
+    DEFAULT_PRICE_ADD = 50.0 
+    # -------------------------------------------------------------
+
     parser = argparse.ArgumentParser(description="Evaluate site designs.")
-    parser.add_argument("--site", nargs='+', default=["Golfe_du_Lion","NordsoenMidt", "Thetys", "Sud_Atlantique", "Vestavind", "SicilySouth"])
+    parser.add_argument("--site", nargs='+', default=["Golfe_du_Lion", "SicilySouth", "Sud_Atlantique", "Sud_Atlantique_Wind", "Thetys", "NordsoenMidt", "Vestavind"],)
     parser.add_argument("--list-sites", action="store_true")
     parser.add_argument("--start-year", type=int, default=1982)
     parser.add_argument("--end-year", type=int, default=2015)
     parser.add_argument("--lifetime-years", type=int, default=25)
     parser.add_argument("--output-csv", default=None)
+    parser.add_argument("--price-add", type=float, default=DEFAULT_PRICE_ADD, 
+                        help=f"Price offset in Eur/MWh (Default: {DEFAULT_PRICE_ADD})")
     args = parser.parse_args()
 
     site_config_dir = _get_site_config_dir()
@@ -387,12 +403,14 @@ def main():
                 start_year=args.start_year,
                 end_year=args.end_year,
                 lifetime_years=args.lifetime_years,
+                price_add=args.price_add
             )
             
             output_csv = args.output_csv
             if output_csv is None:
                 os.makedirs(_get_evaluations_dir(), exist_ok=True)
-                output_csv = os.path.join(_get_evaluations_dir(), f"{site_name}_yearly_eval_{args.start_year}_{args.end_year}_life{args.lifetime_years}.csv")
+                p_suffix = f"_p{args.price_add}" if args.price_add != 0 else ""
+                output_csv = os.path.join(_get_evaluations_dir(), f"{site_name}_yearly_eval_{args.start_year}_{args.end_year}_life{args.lifetime_years}{p_suffix}.csv")
             elif len(args.site) > 1:
                 base, ext = os.path.splitext(output_csv)
                 output_csv = f"{base}_{site_name}{ext}"

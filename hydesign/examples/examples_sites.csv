@@ -5,3 +5,4 @@
 3;Europe;SicilySouth;13.210;37.159;100;Europe/GWA2/input_ts_Siciliy_South.csv;Europe/hpp_pars_offshore.yml;Europe/2030-EL_PRICE.csv;IT_S;;;;;;
 4;Europe;Golfe_du_Lion;4.294;43.012;100;Europe/GWA2/input_ts_Golfe_Du_Lion.csv;Europe/hpp_pars_offshore.yml;Europe/2030-EL_PRICE.csv;FRR;;;;;;
 5;Europe;Sud_Atlantique;-1.7802;45.8912;100;Europe/GWA2/input_ts_Sud_Atlantique.csv;Europe/hpp_pars_offshore.yml;Europe/2030-EL_PRICE.csv;FRR;;;;;;
+6;Europe;Sud_Atlantique_Wind;-1.7802;45.8912;100;Europe/GWA2/input_ts_Sud_Atlantique.csv;Europe/hpp_pars_offshore.yml;Europe/2030-EL_PRICE.csv;FRR;;;;;;

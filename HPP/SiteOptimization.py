@@ -74,21 +74,21 @@ OPT_VARIABLES = {
         #   'value': 7
         #   },
     'solar_MW [MW]':
-         {'var_type':'design',
-           'limits':[0, 1000],
-           'types':'int'
-           },
-       # {'var_type':'fixed',
-       #   'value': 200
-       #   },
+       #  {'var_type':'design',
+       #    'limits':[0, 1000],
+       #    'types':'int'
+       #    },
+        {'var_type':'fixed',
+          'value': 0
+          },
     'surface_tilt [deg]':
-         {'var_type':'design',
-           'limits':[0, 17],
-           'types':'float'
-           },
-        #{'var_type':'fixed',
-        #'value': 15
-        #  },
+         #{'var_type':'design',
+         #  'limits':[0, 17],
+         #  'types':'float'
+         #  },
+        {'var_type':'fixed',
+        'value': 0
+          },
     'surface_azimuth [deg]':
          #{'var_type':'design',
          #  'limits':[150, 210],
@@ -378,7 +378,7 @@ def main():
     )
     parser.add_argument(
         '--site',
-        default='Thetys',
+        default='Sud_Atlantique_Wind',
         help=(
             "Site name from examples_sites.csv, row index, or 'all' "
             'to run every site'

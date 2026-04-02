@@ -82,9 +82,9 @@ BANKABILITY_METRICS = [
 # - ["SicilySouth"] for one site
 # - ["SicilySouth", "NordsoenMidt"] for multiple sites
 # - [] for all sites found in INPUT_DIR_DEFAULT
-SITES_TO_PLOT = ["Golfe_du_Lion", "SicilySouth", "NordsoenMidt", "Sud_Atlantique", "Thetys", "Vestavind"]  # Example: plot only Golfe_du_Lion site. Set to [] to plot all sites in input dir.
-INPUT_DIR_DEFAULT = os.path.join("hydesign", "HPP", "Evaluations")
-OUTPUT_DIR_DEFAULT = os.path.join("hydesign", "HPP", "Evaluations", "plots")
+SITES_TO_PLOT = []  # Example: plot only Golfe_du_Lion site. Set to [] to plot all sites in input dir.
+INPUT_DIR_DEFAULT = os.path.join("HPP", "Evaluations", "P50")
+OUTPUT_DIR_DEFAULT = os.path.join("HPP", "Evaluations", "P50", "plots")
 
 
 def _find_column(df, candidates):
