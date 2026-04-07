@@ -295,10 +295,10 @@ def evaluate_single_year(year, site_name, latitude, longitude, altitude, sim_par
         for col in price_cols:
             year_df[col] = year_df[col] + price_add
 
-    lifetime_df = _repeat_year_to_lifetime(year_df, year, lifetime_years)
-
-    year_input_ts_fn = os.path.join(temp_dir, f"input_ts_{site_name}_{year}_x{lifetime_years}.csv")
-    lifetime_df.to_csv(year_input_ts_fn, sep=";")
+    # The hydesign model expects one representative year and handles lifetime
+    # expansion/degradation internally through `life_y`.
+    year_input_ts_fn = os.path.join(temp_dir, f"input_ts_{site_name}_{year}.csv")
+    year_df.to_csv(year_input_ts_fn, sep=";")
 
     hpp = hpp_model(
         latitude=latitude,
@@ -319,7 +319,7 @@ def evaluate_single_year(year, site_name, latitude, longitude, altitude, sim_par
         "lifetime_years": lifetime_years,
         "price_added": price_add,
         "input_rows_per_year": len(year_df),
-        "input_rows_lifetime": len(lifetime_df)
+        "input_rows_lifetime": len(year_df) * lifetime_years,
     })
     row.update(_extract_mean_annual_generation(hpp, lifetime_years, design["solar_MW"], year_df))
     row.update(calculate_bankability_metrics(row))
@@ -338,6 +338,33 @@ def evaluate_single_year(year, site_name, latitude, longitude, altitude, sim_par
 
     print(f"Evaluated year {year} (Price offset: +{price_add})")
     return row, hourly_df
+
+
+def _append_bankability_quantiles(results_df):
+    """Add scenario-level LLCR quantiles based on weather-year distribution.
+
+    LLCR P90 is reported as the conservative downside level (10th percentile),
+    consistent with P90-exceedance style reporting.
+    """
+    llcr_col = "LLCR [-]"
+    if llcr_col not in results_df.columns:
+        return results_df
+
+    llcr_values = (
+        pd.to_numeric(results_df[llcr_col], errors="coerce")
+        .dropna()
+        .to_numpy()
+    )
+    if llcr_values.size == 0:
+        return results_df
+
+    llcr_p50 = float(np.nanpercentile(llcr_values, 50))
+    llcr_p90 = float(np.nanpercentile(llcr_values, 10))
+
+    results_df = results_df.copy()
+    results_df["LLCR P50 [-]"] = llcr_p50
+    results_df["LLCR P90 [-]"] = llcr_p90
+    return results_df
 
 
 def evaluate_yearly_lifetime(site_name, latitude, longitude, altitude, sim_pars_fn, 
@@ -366,22 +393,24 @@ def evaluate_yearly_lifetime(site_name, latitude, longitude, altitude, sim_pars_
         hourly_all.to_csv(hourly_csv, index=False)
         print(f"Saved hourly wind/solar production: {hourly_csv}")
 
-    return pd.DataFrame(rows)
+    results_df = pd.DataFrame(rows)
+    results_df = _append_bankability_quantiles(results_df)
+    return results_df
 
 
 def main():
     _init_local_hydesign_imports()
 
     # --- CHANGE THIS VALUE TO ADJUST PRICE PERMANENTLY IN CODE ---
-    DEFAULT_PRICE_ADD = 50.0 
+    DEFAULT_PRICE_ADD = 30
     # -------------------------------------------------------------
 
     parser = argparse.ArgumentParser(description="Evaluate site designs.")
-    parser.add_argument("--site", nargs='+', default=["Golfe_du_Lion", "SicilySouth", "Sud_Atlantique", "Sud_Atlantique_Wind", "Thetys", "NordsoenMidt", "Vestavind"],)
+    parser.add_argument("--site", nargs='+', default=["Golfe_du_Lion", "SicilySouth", "Sud_Atlantique", "Sud_Atlantique_Wind", "Thetys", "NordsoenMidt", "Vestavind"],) # "Golfe_du_Lion", "SicilySouth", "Sud_Atlantique", "Sud_Atlantique_Wind", "Thetys", "NordsoenMidt", "Vestavind"
     parser.add_argument("--list-sites", action="store_true")
     parser.add_argument("--start-year", type=int, default=1982)
-    parser.add_argument("--end-year", type=int, default=1982)
-    parser.add_argument("--lifetime-years", type=int, default=1)
+    parser.add_argument("--end-year", type=int, default=2015)
+    parser.add_argument("--lifetime-years", type=int, default=25)
     parser.add_argument("--output-csv", default=None)
     parser.add_argument("--price-add", type=float, default=DEFAULT_PRICE_ADD, 
                         help=f"Price offset in Eur/MWh (Default: {DEFAULT_PRICE_ADD})")
@@ -430,3 +459,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

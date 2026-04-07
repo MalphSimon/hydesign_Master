@@ -1,6 +1,7 @@
 import argparse
 import glob
 import os
+import math
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -52,12 +53,15 @@ BANKABILITY_METRICS = [
         "candidates": ["DSCR [-]"],
     },
     {
-        "key": "llcr",
-        "title": "LLCR",
-        "ylabel": "[-]",
+        "key": "break_even_ppa",
+        "title": "Break-even PPA",
+        "ylabel": "EUR/MWh",
         "color": "tab:orange",
         "style": "line",
-        "candidates": ["LLCR [-]"],
+        "candidates": [
+            "Break-even PPA price [Euro/MWh]",
+            "Break-even PPA",
+        ],
     },
     {
         "key": "dscr_breach_years",
@@ -83,8 +87,8 @@ BANKABILITY_METRICS = [
 # - ["SicilySouth", "NordsoenMidt"] for multiple sites
 # - [] for all sites found in INPUT_DIR_DEFAULT
 SITES_TO_PLOT = []  # Example: plot only Golfe_du_Lion site. Set to [] to plot all sites in input dir.
-INPUT_DIR_DEFAULT = os.path.join("HPP", "Evaluations", "P50")
-OUTPUT_DIR_DEFAULT = os.path.join("HPP", "Evaluations", "P50", "plots")
+INPUT_DIR_DEFAULT = os.path.join("HPP", "Evaluations", "P20")  # Change to "P50" if you want to plot P50 evaluations instead of P20.
+OUTPUT_DIR_DEFAULT = os.path.join("HPP", "Evaluations", "P20", "plots")
 
 
 def _find_column(df, candidates):
@@ -145,16 +149,128 @@ def _plot_metric(ax, x, labels, y, cfg):
     ax.set_xticklabels(year_short, rotation=35)
 
 
+def _plot_bankability_dual_axis(df, site_name, x, year_labels, output_dir):
+    dscr_col = _find_column(df, ["DSCR [-]", "DSCR"])
+    headroom_col = _find_column(
+        df,
+        ["Debt Headroom [MEuro]", "Debt Headroom"],
+    )
+
+    fig, ax_left = plt.subplots(figsize=(14, 6), constrained_layout=True)
+    ax_right = ax_left.twinx()
+
+    line_handles = []
+    line_labels = []
+    headroom_min = None
+    headroom_max = None
+
+    if dscr_col is not None:
+        dscr = pd.to_numeric(df[dscr_col], errors="coerce").to_numpy()
+        left_line = ax_left.plot(
+            x,
+            dscr,
+            marker="o",
+            linewidth=2.0,
+            color="tab:blue",
+            label="DSCR",
+        )[0]
+        line_handles.append(left_line)
+        line_labels.append("DSCR")
+    else:
+        ax_left.text(0.5, 0.5, "DSCR column not found", ha="center", va="center")
+
+    if headroom_col is not None:
+        headroom = pd.to_numeric(df[headroom_col], errors="coerce").to_numpy()
+        finite_headroom = headroom[np.isfinite(headroom)]
+        if finite_headroom.size > 0:
+            headroom_min = float(np.min(finite_headroom))
+            headroom_max = float(np.max(finite_headroom))
+        right_bars = ax_right.bar(
+            x,
+            headroom,
+            color="tab:green",
+            alpha=0.35,
+            width=0.55,
+            label="Debt Headroom",
+        )
+        line_handles.append(right_bars[0])
+        line_labels.append("Debt Headroom")
+    else:
+        ax_right.text(
+            0.5,
+            0.5,
+            "Debt Headroom column not found",
+            ha="center",
+            va="center",
+            transform=ax_right.transAxes,
+        )
+
+    ax_left.set_ylabel("DSCR [-]", color="tab:blue")
+    ax_right.set_ylabel("Debt Headroom [MEuro]", color="tab:green")
+    ax_left.set_xlabel("Year")
+    ax_left.set_title(f"Bankability - DSCR and Debt Headroom - {site_name}")
+    ax_left.grid(True, alpha=0.25)
+
+    if (
+        headroom_min is not None
+        and headroom_max is not None
+        and headroom_min < 0
+    ):
+        step = 50.0
+        y_min = step * math.floor(headroom_min / step)
+        y_max = step * math.ceil(headroom_max / step)
+        if y_max <= y_min:
+            y_max = y_min + step
+        ax_right.set_ylim(y_min, y_max)
+        ax_right.set_yticks(np.arange(y_min, y_max + step, step))
+    elif headroom_max is not None and headroom_max > 0:
+        step = 50.0
+        y_min = 0.0
+        y_max = step * math.ceil(headroom_max / step)
+        if y_max <= y_min:
+            y_max = y_min + step
+        ax_right.set_ylim(y_min, y_max)
+        ax_right.set_yticks(np.arange(y_min, y_max + step, step))
+
+    ax_left.set_xticks(x)
+    year_num = pd.to_numeric(year_labels, errors="coerce")
+    year_short = []
+    for val in year_num:
+        if pd.notna(val):
+            year_short.append(f"{int(val) % 100:02d}")
+        else:
+            year_short.append("")
+    ax_left.set_xticklabels(year_short, rotation=35)
+
+    if line_handles:
+        ax_left.legend(line_handles, line_labels, loc="best")
+
+    os.makedirs(output_dir, exist_ok=True)
+    out_fn = os.path.join(output_dir, f"{site_name}_bankability_metrics.png")
+    fig.savefig(out_fn, dpi=160)
+    plt.close(fig)
+    return out_fn
+
+
 def plot_site_file(csv_path, output_dir, metrics=None, metric_type="yearly"):
     if metrics is None:
         metrics = METRICS
-    
+
     df = pd.read_csv(csv_path)
     if df.empty:
         raise ValueError(f"Input CSV has no rows: {csv_path}")
 
     site_name = _infer_site_name(df, csv_path)
     x, year_labels = _prepare_year_axis(df)
+
+    if metric_type == "bankability":
+        return _plot_bankability_dual_axis(
+            df=df,
+            site_name=site_name,
+            x=x,
+            year_labels=year_labels,
+            output_dir=output_dir,
+        )
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 8), constrained_layout=True)
     axes = axes.flatten()

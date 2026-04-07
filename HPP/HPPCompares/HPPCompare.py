@@ -44,10 +44,10 @@ BANKABILITY_METRICS = [
     },
     {
         "key": "llcr",
-        "title": "LLCR Mean",
+        "title": "LLCR P50 Mean",
         "ylabel": "[-]",
         "color": "#ff9800",
-        "candidates": ["LLCR [-]"],
+        "candidates": ["LLCR P50 [-]", "LLCR P50", "LLCR [-]"],
     },
     {
         "key": "dscr_breach_years",
@@ -79,7 +79,7 @@ def compare_yearly_evaluations(names, site_dir, portfolio_dir, save_path, metric
     for name in names:
         # 1. Determine file path (Check Site dir first, then Portfolio dir)
         # Individual HPP naming convention
-        site_path = os.path.join(site_dir, f"{name}_yearly_eval_1982_2015_life25.csv")
+        site_path = os.path.join(site_dir, f"{name}_yearly_eval_1982_2015_life25_p30.csv")
         # Portfolio naming convention
         port_path = os.path.join(portfolio_dir, f"{name}_yearly.csv")
 
@@ -169,18 +169,20 @@ def compare_financial_and_bankability(names, site_dir, portfolio_dir, financial_
     )
 
 # --- Execute ---
-SITE_DIR = r"C:\Users\malth\HPP\hydesign\HPP\Evaluations\Original"
+SITE_DIR = r"C:\Users\malth\HPP\hydesign\HPP\Evaluations\P30"
 PORT_DIR = r"C:\Users\malth\HPP\hydesign\HPP\Portfolio\Outputs"
-SAVE_TO_FINANCIAL = r"C:\Users\malth\HPP\hydesign\HPP\HPPCompares\HPPEvalCompare_Sud_Atlantique_finance.png"
-SAVE_TO_BANKABILITY = r"C:\Users\malth\HPP\hydesign\HPP\HPPCompares\HPPEvalCompare_Sud_Atlantique_bankability.png"
+SAVE_TO_FINANCIAL = r"C:\Users\malth\HPP\hydesign\HPP\HPPCompares\HPPEvalCompareP30finance.png"
+SAVE_TO_BANKABILITY = r"C:\Users\malth\HPP\hydesign\HPP\HPPCompares\HPPEvalCompareP30_bankability.png"
 
 # Mix and match sites and portfolios here:
 compare_financial_and_bankability(
     names=[
         "Golfe_du_Lion", 
         "NordsoenMidt", 
-        "sud_Atlantique",
-        "Sud_Atlantique_Wind" 
+        "Vestavind",
+        "SicilySouth",
+        "Sud_Atlantique",
+        "Thetys", 
     ],
     site_dir=SITE_DIR,
     portfolio_dir=PORT_DIR,

@@ -46,23 +46,6 @@ def _infer_cfads_degradation_rate(row, cfg):
         if pd.notna(rate):
             return float(max(0.0, rate))
 
-    aep = _to_float(row.get("AEP [GWh]"))
-    aep_with_deg = _to_float(row.get("AEP with degradation [GWh]"))
-    lifetime_years = int(_to_float(row.get("lifetime_years"), default=0))
-
-    if (
-        pd.notna(aep)
-        and pd.notna(aep_with_deg)
-        and aep > 0
-        and aep_with_deg > 0
-        and lifetime_years > 1
-        and aep_with_deg < aep
-    ):
-        end_ratio = aep_with_deg / aep
-        rate = 1.0 - end_ratio ** (1.0 / (lifetime_years - 1))
-        if pd.notna(rate):
-            return float(min(max(0.0, rate), 0.20))
-
     return 0.0
 
 
