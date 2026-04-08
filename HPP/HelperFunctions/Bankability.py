@@ -7,7 +7,7 @@ import pandas as pd
 DEFAULT_BANKABILITY_ASSUMPTIONS = {
     "debt_fraction": 0.70,
     "debt_interest_rate": 0.06,
-    "debt_tenor_years": 20,
+    "debt_tenor_years": 25,
     "target_min_dscr": 1.20,
     "cfads_degradation_rate": None,
     "llcr_discount_rate": None,
