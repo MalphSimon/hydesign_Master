@@ -4,52 +4,52 @@ sp [W/m2],343.0
 p_rated [MW],15.0
 Nwt,31.0
 wind_MW_per_km2 [MW/km2],5.0
-solar_MW [MW],634.0
-surface_tilt [deg],0.9333
+solar_MW [MW],338.46
+surface_tilt [deg],16.6209
 surface_azimuth [deg],180.0
-DC_AC_ratio,1.00295
+DC_AC_ratio,1.0
 b_P [MW],0.0
-b_E_h [h],2.0
-cost_of_battery_P_fluct_in_peak_price_ratio,3.1100000000000003
+b_E_h [h],1.0
+cost_of_battery_P_fluct_in_peak_price_ratio,17.898
 name,Thetys
 longitude,4.193
 latitude,52.542
 altitude,100
-NPV_over_CAPEX,-0.7988415936391144
-NPV [MEuro],-1153.4308018426773
+NPV_over_CAPEX,-0.7560668669337371
+NPV [MEuro],-981.2916788032983
 IRR,0.0
-LCOE [Euro/MWh],57.684465000477914
-Revenues [MEuro],58.02203810796105
-CAPEX [MEuro],1443.8792509391449
-OPEX [MEuro],35.18758966853842
+LCOE [Euro/MWh],57.91811205263462
+Revenues [MEuro],57.48144308533298
+CAPEX [MEuro],1297.890069939145
+OPEX [MEuro],32.32919372255179
 Wind CAPEX [MEuro],818.2062099391449
-Wind OPEX [MEuro],29.14682181853842
-PV CAPEX [MEuro],312.173041
-PV OPEX [MEuro],6.04076785
+Wind OPEX [MEuro],29.113823722551793
+PV CAPEX [MEuro],166.18386
+PV OPEX [MEuro],3.21537
 Batt CAPEX [MEuro],0.0
 Batt OPEX [MEuro],0.0
 Shared CAPEX [MEuro],313.5
 Shared OPEX [MEuro],0.0
 penalty lifetime [MEuro],0.0
-Mean Annual Electricity Sold [GWh],2508.2530788255744
-GUF,0.5726605202798115
+Mean Annual Electricity Sold [GWh],2272.406131466481
+GUF,0.5188141852663198
 grid [MW],500.0
 wind [MW],465.0
-solar [MW],634.0
+solar [MW],338.46
 Battery Energy [MWh],0.0
 Battery Power [MW],0.0
-Total curtailment [GWh],3095.3116355609855
-Total curtailment with deg [GWh],2729.541099509169
+Total curtailment [GWh],820.2076388910713
+Total curtailment with deg [GWh],715.3978337051435
 Awpp [km2],93.0
-Apvp [km2],10.144
+Apvp [km2],5.41536
 Plant area [km2],93.0
 Rotor diam [m],235.96828103188196
 Hub height [m],144.98414051594096
 Number of batteries used in lifetime,0.0
-Break-even PPA price [Euro/MWh],59.38337695896833
-Capacity factor wind [-],0.48357658611521764
-AEP [GWh],2660.491434081727
-AEP with degradation [GWh],2617.4347228059414
+Break-even PPA price [Euro/MWh],59.63587531950706
+Capacity factor wind [-],0.48173965346725406
+AEP [GWh],2323.5403825075123
+AEP with degradation [GWh],2301.022044814687
 design obj,NPV_over_CAPEX
-opt time [min],9.08
-n_model_evals,126
+opt time [min],8.81
+n_model_evals,122

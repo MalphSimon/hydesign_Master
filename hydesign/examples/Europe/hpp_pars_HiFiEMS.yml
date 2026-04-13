@@ -1,46 +1,50 @@
 # --------------------------------------------------------------------------------------------
 # HPP Global
 # --------------------------------------------------------------------------------------------
-G_MW: 100 # Grid capacity
-year: '2021' # Single representative year
+G_MW: 500 # Grid capacity
+year: '2012' # Single representative year
 N_life: 25
-longitude: 8.594398
-latitude: 56.227322
-altitude: 85
+#longitude: 8.594398
+#latitude: 56.227322
+#altitude: 85
 
 # --------------------------------------------------------------------------------------------
 # Wind
 # --------------------------------------------------------------------------------------------
-wind_turbine_cost: 640_000  # [Euro/MW] for reference turbine
-wind_civil_works_cost: 260_000  # [Euro/MW]
-wind_fixed_onm_cost: 12_600  # Wind fixed O&M cost per year [Euro/MW /year]
-wind_variable_onm_cost: 1.35 #[EUR/MWh_e] Danish Energy Agency
+wind_turbine_cost: 1190000  # [Euro/MW] for reference turbine
+wind_civil_works_cost: 570000 # 628000  # [Euro/MW]
+wind_fixed_onm_cost: 44000  # Wind fixed O&M cost per year [Euro/MW /year]
+wind_variable_onm_cost: 4.41 #[EUR/MWh_e] Danish Energy Agency
 
-d_ref: 145
-hh_ref: 100
-p_rated_ref: 5.0 #[MW] 
-
+d_ref: 236
+hh_ref: 145
+p_rated_ref: 15  #[MW]  
 # Degradation
 wpp_efficiency: 1
 wind_deg_yr: [0, 25]
-wind_deg: [0, 0.25] #25yr * 1%/yr
+wind_deg: [0, 0] 
 share_WT_deg_types: 0.5
+
 
 # --------------------------------------------------------------------------------------------
 # PV 
 # --------------------------------------------------------------------------------------------
-solar_PV_cost: 110_000   # [Euro/MW DC]
-solar_hardware_installation_cost: 100_000  # [Euro/MW DC]
-solar_inverter_cost: 20_000 #[Euro/MW]
-solar_fixed_onm_cost: 4_500  # Solar O&M cost per year [Euro/MW] DC
-land_use_per_solar_MW: 0.01226 # Danish energy agency
+
+# Second edition Offshore PV cost parameters Source: World bank and SERIS 2019 
+solar_PV_cost: 120000   # [Euro/MW DC]  Module price from DEA 2025. 
+solar_hardware_installation_cost: 350000  # [Euro/MW DC]
+solar_inverter_cost: 21000 #[Euro/MW] Sorce: DEA
+solar_fixed_onm_cost: 9500   #  8635 Solar O&M cost per year [Euro/MW]  Source: ECONOMIC ANALYSIS OF THE PROJECT DEVELOPMENT OF FLOATING SOLAR POWER PLANTS IN MRICA DAM, BANJARNEGARA
+#pv_deg_per_year: 0.5e-2
+land_use_per_solar_MW: 0.016 # Danish energy agency
+
 
 #selected tracker
 tracking: 'No' # 'single_axis'  #
 
 # Degradation
-pv_deg_yr: [0,    1,   25]
-pv_deg: [0.03, 0.03, 0.28] #0.03 intial + 25yr * 1%/yr
+pv_deg_yr: [0,    25]
+pv_deg: [0, 0.125] #0.0 intial + 25yr * 0.5%/yr
 
 # --------------------------------------------------------------------------------------------
 # Battery
@@ -51,16 +55,17 @@ pv_deg: [0.03, 0.03, 0.28] #0.03 intial + 25yr * 1%/yr
 #battery_control_system_cost: 9_000  # Grid management control system cost[Euro/MW]
 #battery_energy_onm_cost: 0 
 
-battery_energy_cost: 45_000  # [Euro/MWh]
-battery_power_cost: 16_000    # Power conversion system cost [Euro/MW]
-battery_BOP_installation_commissioning_cost: 18_000 # Electric BalanceOfPlant, instal+commission cost [Euro/MW]
-battery_control_system_cost: 4_500  # Grid management control system cost[Euro/MW]
-battery_energy_onm_cost: 0 
+battery_energy_cost: 95000  # [Euro/MWh]
+battery_power_cost: 86000    # Power conversion system cost [Euro/MW]
+battery_BOP_installation_commissioning_cost: 150000 # Electric BalanceOfPlant, instal+commission cost [Euro/MW]
+battery_control_system_cost: 9000  # Grid management control system cost[Euro/MW]
+battery_energy_onm_cost: 8.4  
+
 
 # EMS and Degradation parameters
 battery_depth_of_discharge: 0.9 # 1 - Minimum energy level in the battery
 battery_charge_efficiency: 0.98  # Charge efficiency for Lithium-ion
-battery_price_reduction_per_year: 0.10 # Battery price reduction per year
+battery_price_reduction_per_year: 0.05 # Battery price reduction per year
 # n_steps_in_LoH: 20 # Number of battery degradation levels for discretization of lifetime operation
 min_LoH: 0.7 # Minimum energy storage capacity in percent for the storage to be replaced
 
@@ -103,32 +108,33 @@ ramp_down_limit: 50 # ramp-down limit of electrolyzer in MW/h
 # --------------------------------------------------------------------------------------------
 # Shared costs
 # --------------------------------------------------------------------------------------------
-hpp_BOS_soft_cost: 119_940       # [Euro/MW]
-hpp_grid_connection_cost: 50_000 # [Euro/MW]
+hpp_BOS_soft_cost: 120000       # [Euro/MW]
+hpp_grid_connection_cost: 507000 # [Euro/MW] from DEA
 #land cost not same format in excel it's per MW
-land_cost: 300_000  #  [Euro/km**2] from Hybridize imputs 6-12k Euro/acre. 1km2 = 247.105acre
+land_cost: 0  #  [Euro/km**2] from Hybridize imputs 6-12k Euro/acre. 1km2 = 247.105acre
 
 # --------------------------------------------------------------------------------------------
 # Financial and Economic data
 # --------------------------------------------------------------------------------------------
-wind_WACC: 0.052    # Markup of after tax WACC for onshore WT
-solar_WACC: 0.048   # After tax WACC for solar PV
-battery_WACC: 0.080 # After tax WACC for stationary storge li-ion batteries
-tax_rate: 0.22      # Corporate tax rate
-ptg_WACC: 0.07      # After tax WACC for P2H plant
+discount_factor: 0.06 # Discount factor for NPV calculation, can be considered as after tax WACC for the project
+wind_WACC: 0.06    # Markup of after tax WACC for offshore WT
+solar_WACC: 0.05   # After tax WACC for solar PV
+battery_WACC: 0.06 # After tax WACC for stationary storge li-ion batteries
+tax_rate: 0.22    # Corporate tax rate (France)
+ptg_WACC: 0.08      # After tax WACC for P2H plant
 
 # Early CAPEX payment, or phasing 
 phasing_yr: [-1,0]
-phasing_CAPEX: [1,1] # shares will be normalized to sum the CAPEX
+phasing_CAPEX: [0,1] # shares will be normalized to sum the CAPEX
 
 # Inflation will be linearly interpolated at integer year values
-inflation_yr: [-3,    0,    1,   25]
-inflation: [ 0.10, 0.10, 0.06, 0.06]
+inflation_yr: [ 0,    25]
+inflation: [0.02,  0.02]
 ref_yr_inflation: 0 # inflation index is computed with respect to this year
 
 # depreciation
 depreciation_yr: [0, 25]
-depreciation: [0, 1]
+depreciation: [0.03, 0.03]
 
 
 # --------------------------------------------------------------------------------------------
@@ -168,12 +174,12 @@ min_up_bid: 5
 min_dw_bid: 5
 
 # interval parameters: note that DI must <= SI
-dispatch_interval: 0.25
-settlement_interval: 0.25
+dispatch_interval: 1
+settlement_interval: 1
 offer_interval: 1
 
 imbalance_fee: 0.13  # DK: 0.13 Euro/MWh, other Nordic countries: , others: 0.001
-deviation: 100
+deviation: 500 # Same size as grid capacity
 
 
 # Data
@@ -185,10 +191,10 @@ market_fn: "HiFiEMS_inputs/Market/Market2021.csv"
 ## SIMULATION KEYS
 
 wind_as_component: 1
-solar_as_component: 1  # The code does not support for solar power plant
+solar_as_component: 1  
 battery_as_component: 1
-start_date: "2/1/21"
-number_of_run_day: 10  #
+start_date: "1/1/82"
+number_of_run_day: 365  
 out_dir: "./test/"
 # For DEMS
 DA_wind: "DA_1"  # DA, Measurement
@@ -201,9 +207,9 @@ SP: "SM_forecast_1"  # SM_forecast;SM_cleared
 RP: "reg_forecast_1"  # reg_cleared;reg_forecast_pre
 BP: 1  # 1:forecast value 2: perfect value
 # for DDEMS (spot market) -- Historical data
-history_wind_fn: "HiFiEMS_inputs/Power/Winddata2021_15min.csv"
-history_solar_fn: "HiFiEMS_inputs/Power/Solardata2021_15min.csv"
-history_market_fn: "HiFiEMS_inputs/Market/Market2021.csv"
+history_wind_fn: "HiFiEMS_inputs/Power/Winddata2012_FRs.csv"
+history_solar_fn: "HiFiEMS_inputs/Power/Solardata2012_FRs.csv"
+history_market_fn: "HiFiEMS_inputs/Market/Market2012_FRs.csv"
 N_Samples: 10
 epsilon: 85  # for DRO
 epsilon1: 0.05  # for uncertainty set

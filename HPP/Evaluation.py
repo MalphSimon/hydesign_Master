@@ -482,9 +482,15 @@ def _append_bankability_quantiles(results_df):
 
 
 def evaluate_yearly_lifetime(site_name, latitude, longitude, altitude, sim_pars_fn, 
-                             input_ts_fn, design, start_year, end_year, lifetime_years, price_add):
+                             input_ts_fn, design, start_year, end_year, lifetime_years,
+                             price_add, save_hourly_csv=True):
     """
     Orchestrates the parallel evaluation of a site across multiple weather years.
+
+    Args:
+        save_hourly_csv (bool): If True, saves aggregated hourly wind/solar
+            production to CSV. Set to False for large batch workflows where
+            hourly export is not required.
     """
     design_x = _build_design_vector(design)
     input_ts = _read_input_ts(input_ts_fn)
@@ -503,8 +509,8 @@ def evaluate_yearly_lifetime(site_name, latitude, longitude, altitude, sim_pars_
     rows = [r for r, h in results]
     all_hourly = [h for r, h in results if h is not None]
 
-    # Save aggregated hourly production
-    if all_hourly:
+    # Save aggregated hourly production only when explicitly requested.
+    if save_hourly_csv and all_hourly:
         hourly_all = pd.concat(all_hourly, axis=0, ignore_index=True)
         eval_dir = _get_evaluations_dir()
         os.makedirs(eval_dir, exist_ok=True)

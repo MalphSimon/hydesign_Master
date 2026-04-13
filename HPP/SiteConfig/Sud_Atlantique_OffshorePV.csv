@@ -1,0 +1,55 @@
+,Sud_Atlantique
+clearance [m],27.0
+sp [W/m2],343.0
+p_rated [MW],15.0
+Nwt,32.0
+wind_MW_per_km2 [MW/km2],5.0012
+solar_MW [MW],289.0
+surface_tilt [deg],11.1605
+surface_azimuth [deg],180.0
+DC_AC_ratio,1.03895
+b_P [MW],2.0
+b_E_h [h],2.0
+cost_of_battery_P_fluct_in_peak_price_ratio,13.59
+name,Sud_Atlantique
+longitude,-1.7802
+latitude,45.8912
+altitude,100
+NPV_over_CAPEX,-0.819704639366288
+NPV [MEuro],-1063.3930457187737
+IRR,0.0
+LCOE [Euro/MWh],64.85620485226438
+Revenues [MEuro],50.230225426276554
+CAPEX [MEuro],1297.2880652973743
+OPEX [MEuro],31.607628374817896
+Wind CAPEX [MEuro],844.5999586468591
+Wind OPEX [MEuro],28.755157549817895
+PV CAPEX [MEuro],138.181882
+PV OPEX [MEuro],2.852437225
+Batt CAPEX [MEuro],1.006224650515246
+Batt OPEX [MEuro],3.3600000000000004e-05
+Shared CAPEX [MEuro],313.5
+Shared OPEX [MEuro],0.0
+penalty lifetime [MEuro],0.0
+Mean Annual Electricity Sold [GWh],2020.2443750409875
+GUF,0.46124300800022544
+grid [MW],500.0
+wind [MW],480.0
+solar [MW],289.0
+Battery Energy [MWh],4.0
+Battery Power [MW],2.0
+Total curtailment [GWh],510.0053126038393
+Total curtailment with deg [GWh],453.7468294110461
+Awpp [km2],95.97696552827321
+Apvp [km2],4.624
+Plant area [km2],95.97696552827321
+Rotor diam [m],235.96828103188196
+Hub height [m],144.98414051594096
+Number of batteries used in lifetime,2.0
+Break-even PPA price [Euro/MWh],66.80531507073712
+Capacity factor wind [-],0.41175043821087604
+AEP [GWh],2058.8102976890914
+AEP with degradation [GWh],2038.3941694174287
+design obj,NPV_over_CAPEX
+opt time [min],12.42
+n_model_evals,124

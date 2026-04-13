@@ -72,12 +72,14 @@ OPT_VARIABLES = {
         'types': 'float'
     },
     'solar_MW [MW]': {
-        'var_type': 'fixed',
-        'value': 0
+        'var_type': 'design',
+        'limits': [0, 600],
+        'types': 'float'
     },
     'surface_tilt [deg]': {
-        'var_type': 'fixed',
-        'value': 0
+        'var_type': 'design',
+        'limits': [0, 17],
+        'types': 'float'
     },
     'surface_azimuth [deg]': {
         'var_type': 'fixed',
@@ -244,7 +246,7 @@ def _run_one_site(ex_site, price_increment=0.0):
 def main():
     """Main entry point for optimization CLI."""
     parser = argparse.ArgumentParser(description='Run HPP site optimization.')
-    parser.add_argument('--site', default='NordsoenMidt', 
+    parser.add_argument('--site', default='SicilySouth', 
                         help="Site name, row index, or 'all'.")
     parser.add_argument('--list-sites', action='store_true', help='List available sites and exit')
     parser.add_argument('--price-increment', type=float, default=0.0, 

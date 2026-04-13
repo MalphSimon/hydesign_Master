@@ -1,0 +1,2 @@
+name,site_config_file,NPV_over_CAPEX,NPV [MEuro],LCOE [Euro/MWh],wind [MW],solar [MW],status
+SicilySouth,c:\Users\malth\HPP\hydesign\HPP\SiteConfig\SicilySouth.csv,-0.8261989047602435,-1012.8620988563415,66.50731658586355,360.0,567.78,ok

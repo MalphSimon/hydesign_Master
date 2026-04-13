@@ -1,23 +1,11 @@
-"""
-Statistical Comparison Tool for HPP Sites and Portfolios.
-
-This script aggregates results from different simulation runs (individual HPPs 
-and portfolios) to compare their financial and bankability performance. 
-It visualizes the Mean and Standard Deviation (volatility) using bar charts 
-with error bars, allowing for a direct comparison of risk and return.
-"""
-
 import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
 # ---------------------------------------------------------------------------
-# 1. NAME MAPPING CONFIGURATION
+# 1. NAME MAPPING & METRIC CONFIGURATION
 # ---------------------------------------------------------------------------
-# Key: The actual name used in the filename (e.g., "Golfe_du_Lion")
-# Value: The name you want to see on the plot (e.g., "France - Mediterranean")
-
 SITE_DISPLAY_MAP = {
     "Golfe_du_Lion": "Golfe du Lion (FRs)",
     "NordsoenMidt": "Nordsøen Midt (DK)",
@@ -29,10 +17,7 @@ SITE_DISPLAY_MAP = {
     "NordsoenMidt_Golfe_du_Lion": "NSM + GDL Joint"
 }
 
-# ---------------------------------------------------------------------------
-# 2. METRIC CONFIGURATIONS
-# ---------------------------------------------------------------------------
-
+# --- Original Metric Lists ---
 FINANCIAL_METRICS = [
     {"key": "npv", "title": "NPV Mean", "ylabel": "M EUR", "color": "#3498db", "candidates": ["NPV [MEuro]", "NPV"]},
     {"key": "npv_capex", "title": "NPV/CAPEX Mean", "ylabel": "%", "color": "#ff9800", "candidates": ["NPV_over_CAPEX", "NPV/CAPEX"]},
@@ -47,26 +32,24 @@ BANKABILITY_METRICS = [
     {"key": "debt_headroom", "title": "Debt Headroom Mean", "ylabel": "M EUR", "color": "#27ae60", "candidates": ["Debt Headroom [MEuro]"]},
 ]
 
+# --- New NPV-Specific List ---
+NPV_ONLY_METRICS = [
+    {"key": "npv", "title": "NPV Mean", "ylabel": "M EUR", "color": "#3498db", "candidates": ["NPV [MEuro]", "NPV"]},
+    {"key": "npv_capex", "title": "NPV/CAPEX Mean", "ylabel": "%", "color": "#ff9800", "candidates": ["NPV_over_CAPEX", "NPV/CAPEX"]},
+]
+
 # ---------------------------------------------------------------------------
-# 3. CORE LOGIC
+# 2. UPDATED DYNAMIC CORE LOGIC
 # ---------------------------------------------------------------------------
 
 def compare_yearly_evaluations(names, site_dir, portfolio_dir, save_path, metrics, title):
     """
     Computes statistics for sites/portfolios and generates comparison plots.
-    
-    Args:
-        names (list): List of site/portfolio IDs (filenaming keys).
-        site_dir (str): Folder path for individual HPP results.
-        portfolio_dir (str): Folder path for Portfolio results.
-        save_path (str): Full path to save the .png.
-        metrics (list): Metric configuration dictionary.
-        title (str): Figure title.
+    Automatically handles any number of metrics by adjusting subplot grid.
     """
     stats = {n: {} for n in names}
 
     for name in names:
-        # File discovery: Site dir naming vs Portfolio dir naming
         site_path = os.path.join(site_dir, f"{name}_yearly_eval_1982_2015_life25_p30.csv")
         port_path = os.path.join(portfolio_dir, f"{name}_yearly.csv")
 
@@ -81,7 +64,6 @@ def compare_yearly_evaluations(names, site_dir, portfolio_dir, save_path, metric
         df = pd.read_csv(csv_path)
         prefix = "portfolio_" if is_portfolio else ""
 
-        # Column Finder Logic
         def find_col(possibles):
             for p in possibles:
                 for search_str in [f"{prefix}{p}", p]:
@@ -90,7 +72,6 @@ def compare_yearly_evaluations(names, site_dir, portfolio_dir, save_path, metric
                             return c
             return None
 
-        # Statistics Computation
         for cfg in metrics:
             key, col = cfg["key"], find_col(cfg["candidates"])
             if col and col in df.columns:
@@ -100,30 +81,37 @@ def compare_yearly_evaluations(names, site_dir, portfolio_dir, save_path, metric
             else:
                 stats[name][f"{key}_mean"] = stats[name][f"{key}_std"] = 0
 
-    # Plotting Logic
     valid_names = [n for n in names if stats[n]]
     if not valid_names:
         print("No valid data to plot.")
         return
 
-    # Convert Technical names to Display names for the X-Axis
     plot_labels = [SITE_DISPLAY_MAP.get(n, n) for n in valid_names]
 
-    fig, axs = plt.subplots(2, 2, figsize=(16, 10))
+    # --- DYNAMIC GRID CALCULATION ---
+    num_metrics = len(metrics)
+    ncols = 2 if num_metrics > 1 else 1
+    nrows = (num_metrics + 1) // 2
+    
+    fig, axs = plt.subplots(nrows, ncols, figsize=(8 * ncols, 5 * nrows), squeeze=False)
     fig.suptitle(title, fontsize=18)
-    positions = [(0, 0), (0, 1), (1, 0), (1, 1)]
+    axs_flat = axs.flatten()
 
-    for cfg, pos in zip(metrics, positions):
+    for i, cfg in enumerate(metrics):
         key = cfg["key"]
         means = [stats[n].get(f"{key}_mean", 0) for n in valid_names]
         stds = [stats[n].get(f"{key}_std", 0) for n in valid_names]
         
-        # Plotting bars using mapped labels
-        axs[pos].bar(plot_labels, means, yerr=stds, color=cfg["color"], capsize=8, alpha=0.8)
-        axs[pos].set_title(cfg["title"], fontweight='bold')
-        axs[pos].set_ylabel(cfg["ylabel"])
-        axs[pos].grid(axis='y', linestyle='--', alpha=0.6)
-        plt.setp(axs[pos].get_xticklabels(), rotation=30, ha='right')
+        ax = axs_flat[i]
+        ax.bar(plot_labels, means, yerr=stds, color=cfg["color"], capsize=8, alpha=0.8)
+        ax.set_title(cfg["title"], fontweight='bold')
+        ax.set_ylabel(cfg["ylabel"])
+        ax.grid(axis='y', linestyle='--', alpha=0.6)
+        plt.setp(ax.get_xticklabels(), rotation=30, ha='right')
+
+    # Remove empty subplots if number of metrics is odd
+    for j in range(i + 1, len(axs_flat)):
+        fig.delaxes(axs_flat[j])
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
@@ -131,48 +119,41 @@ def compare_yearly_evaluations(names, site_dir, portfolio_dir, save_path, metric
     print(f"Successfully saved plot: {os.path.basename(save_path)}")
 
 
-def compare_financial_and_bankability(
-    names,
-    site_dir,
-    portfolio_dir,
-    financial_save_path=None,
-    bankability_save_path=None,
-    f_save=None,
-    b_save=None,
-):
-    """Orchestrates both financial and bankability comparison plots."""
-    # Keep backward compatibility with legacy parameter names.
-    financial_save_path = financial_save_path or f_save
-    bankability_save_path = bankability_save_path or b_save
-
-    if not financial_save_path or not bankability_save_path:
-        raise ValueError(
-            "Both financial and bankability save paths must be provided."
-        )
-
-    # Financial Comparison
+def compare_financial_and_bankability(names, site_dir, portfolio_dir, finance_path, bank_path, npv_path):
+    """Orchestrates all three comparison plots."""
+    
+    # 1. Original Financial Comparison (4 Plots)
     compare_yearly_evaluations(
-        names, site_dir, portfolio_dir, financial_save_path, FINANCIAL_METRICS,
+        names, site_dir, portfolio_dir, finance_path, FINANCIAL_METRICS,
         "HPP vs Portfolio Financial Summary Statistics (Mean ± Std)"
     )
-    # Bankability Comparison
+    
+    # 2. Original Bankability Comparison (4 Plots)
     compare_yearly_evaluations(
-        names, site_dir, portfolio_dir, bankability_save_path, BANKABILITY_METRICS,
+        names, site_dir, portfolio_dir, bank_path, BANKABILITY_METRICS,
         "HPP vs Portfolio Bankability Summary Statistics (Mean ± Std)"
     )
 
+    # 3. NEW NPV & NPV/CAPEX Comparison (Only 2 Plots)
+    compare_yearly_evaluations(
+        names, site_dir, portfolio_dir, npv_path, NPV_ONLY_METRICS,
+        "HPP vs Portfolio: NPV & Efficiency Comparison"
+    )
+
 # ---------------------------------------------------------------------------
-# 4. EXECUTION
+# 3. EXECUTION
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     # --- Local Paths ---
     SITE_DIR = r"C:\Users\malth\HPP\hydesign\HPP\Evaluations\P30"
     PORT_DIR = r"C:\Users\malth\HPP\hydesign\HPP\Portfolio\Outputs"
+    
     SAVE_FINANCE = r"C:\Users\malth\HPP\hydesign\HPP\HPPCompares\HPPEvalCompareP300finance.png"
     SAVE_BANK = r"C:\Users\malth\HPP\hydesign\HPP\HPPCompares\HPPEvalCompareP300bankability.png"
+    SAVE_NPV_ONLY = r"C:\Users\malth\HPP\hydesign\HPP\HPPCompares\NPV_CAPEX_Comparison.png"
 
-    # --- Site List (Use the Filename Keys here) ---
+    # --- Site List ---
     COMPARE_LIST = [
         "Golfe_du_Lion", 
         "NordsoenMidt", 
@@ -180,13 +161,14 @@ if __name__ == "__main__":
         "SicilySouth",
         "Sud_Atlantique",
         "Thetys",
-        "NordsoenMidt_Golfe_du_Lion" # Example portfolio entry
+        "NordsoenMidt_Golfe_du_Lion"
     ]
 
     compare_financial_and_bankability(
         names=COMPARE_LIST,
         site_dir=SITE_DIR,
         portfolio_dir=PORT_DIR,
-        financial_save_path=SAVE_FINANCE,
-        bankability_save_path=SAVE_BANK,
+        finance_path=SAVE_FINANCE,
+        bank_path=SAVE_BANK,
+        npv_path=SAVE_NPV_ONLY
     )
