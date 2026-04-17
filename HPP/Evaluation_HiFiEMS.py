@@ -202,18 +202,18 @@ def evaluate_hifiems_site(site_name, start_year, end_year, lifetime_years, price
     # Save Results
     results_df = pd.DataFrame(results)
     if output_csv is None:
-        output_csv = f"{site_name}_HiFiEMS_eval_{start_year}_{end_year}_life{lifetime_years}.csv"
+        output_csv = f"{site_name}_eval_{start_year}_{end_year}_life{lifetime_years}.csv"
     results_df.to_csv(output_csv, index=False)
     print(f"Results saved to: {output_csv}")
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate HPP site(s) using HiFiEMS config.")
-    parser.add_argument("--sites", default="Sud_Atlantique_HiFiEMS", help="Comma-separated list of site names, or 'ALL' for all HiFiEMS sites.")
+    parser.add_argument("--sites", default="Sud_Atlantique", help="Comma-separated list of site names, or 'ALL' for all HiFiEMS sites.")
     parser.add_argument("--start-year", type=int, default=1982)
     parser.add_argument("--end-year", type=int, default=2015)
     parser.add_argument("--lifetime-years", type=int, default=25)
     parser.add_argument("--output-csv", default=None)
-    parser.add_argument("--price-add", type=float, default=30)
+    parser.add_argument("--price-add", type=float, default=42)
     args = parser.parse_args()
 
     # Load all HiFiEMS site names from examples_sites.csv if needed

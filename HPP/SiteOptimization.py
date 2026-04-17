@@ -64,7 +64,7 @@ OPT_VARIABLES = {
     'Nwt': {
         'var_type': 'design',
         'limits': [0, 100],
-        'types': 'int'
+        'types': 'float'
     },
     'wind_MW_per_km2 [MW/km2]': {
         'var_type': 'design',
@@ -72,9 +72,8 @@ OPT_VARIABLES = {
         'types': 'float'
     },
     'solar_MW [MW]': {
-        'var_type': 'design',
-        'limits': [0, 600],
-        'types': 'float'
+        'var_type': 'fixed',
+        'value': 0
     },
     'surface_tilt [deg]': {
         'var_type': 'design',
@@ -91,14 +90,12 @@ OPT_VARIABLES = {
         'types': 'float'
     },
     'b_P [MW]': {
-        'var_type': 'design',
-        'limits': [0, 100],
-        'types': 'int'
+        'var_type': 'fixed',
+        'value':0
     },
     'b_E_h [h]': {
-        'var_type': 'design',
-        'limits': [1, 8],
-        'types': 'int'
+        'var_type': 'fixed',
+        'value': 0
     },
     'cost_of_battery_P_fluct_in_peak_price_ratio': {
         'var_type': 'design',
@@ -152,7 +149,7 @@ def _build_inputs(ex_site, price_increment=0.0):
         'n_procs': n_procs,
         'n_doe': n_doe,
         'n_clusters': n_procs,
-        'n_seed': 1,
+        'n_seed': 0,
         'max_iter': 4,
         'final_design_fn': os.path.join(site_config_dir, f'{site_filename}.csv'),
         'npred': 5e3,
@@ -246,7 +243,7 @@ def _run_one_site(ex_site, price_increment=0.0):
 def main():
     """Main entry point for optimization CLI."""
     parser = argparse.ArgumentParser(description='Run HPP site optimization.')
-    parser.add_argument('--site', default='SicilySouth', 
+    parser.add_argument('--site', default='Sud_Atalantique_Wind_HiFiEMS', 
                         help="Site name, row index, or 'all'.")
     parser.add_argument('--list-sites', action='store_true', help='List available sites and exit')
     parser.add_argument('--price-increment', type=float, default=0.0, 

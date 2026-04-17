@@ -4,11 +4,15 @@ import os
 import sys
 from pathlib import Path
 from typing import Dict, Iterable, Optional
-
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+import matplotlib.ticker as ticker
+import matplotlib.lines as mlines
 import pandas as pd
+import numpy as np
 import seaborn as sns
+
+
 
 if __package__ in (None, ""):
     repo_root = Path(__file__).resolve().parents[2]
@@ -174,54 +178,14 @@ def plot_wind_speed_distribution(
     site_ids: Optional[Iterable[int]] = None,
     wind_col: str = "WS_150",
     figsize: Optional[tuple] = None,
-    title: str = "Wind speed distrubution",
+    title: str = "Wind Speed Distribution",
     bins: int = 30,
     save_path: Optional[str] = None,
+    manual_site_names: Optional[Iterable[str]] = None, # Added manual control
 ) -> tuple:
     """
-    Create a figure with histograms of wind speed distributions for selected sites.
-
-    Parameters
-    ----------
-    site_ids : Optional[Iterable[int]]
-        List of site indices to include. If None, includes first 3 sites by default.
-        Available sites: 0-5 (NordsoenMidt, Thetys, Vestavind, SicilySouth, 
-        Golfe_du_Lion, Sud_Atlantique)
-    wind_col : str
-        Name of the wind speed column in the input data. Default: "WS_150"
-    figsize : Optional[tuple]
-        Figure size as (width, height). If None, auto-sized based on number of sites.
-    title : str
-        Title for the figure.
-    bins : int
-        Number of bins for the histograms.
-    save_path : Optional[str]
-        Directory path to save the figure. If provided, figure is saved as PNG.
-        Directory is created if it doesn't exist.
-
-    Returns
-    -------
-    tuple
-        (fig, axes) - matplotlib Figure and Axes objects for further customization.
-
-    Example
-    -------
-    # Plot default 3 sites
-    fig, axes = plot_wind_speed_distribution(site_ids=[0, 5, 3])
-    plt.show()
-
-    # Plot specific sites
-    fig, axes = plot_wind_speed_distribution(site_ids=[0, 1, 5])
-    plt.show()
-
-    # Plot and save to folder
-    fig, axes = plot_wind_speed_distribution(
-        site_ids=[0, 5, 3],
-        save_path="C:/Users/malth/HPP/hydesign/HPP/DataStoreage"
-    )
-    # Plot all 6 sites
-    fig, axes = plot_wind_speed_distribution(site_ids=range(6))
-    plt.show()
+    Create a figure with histograms of wind speed distributions with 
+    manual site naming and top-right legends for mean values.
     """
     # Load data
     examples_sites = load_examples_sites()
@@ -229,10 +193,16 @@ def plot_wind_speed_distribution(
 
     # Default to first 3 sites if none specified
     if site_ids is None:
-        site_ids = [0, 5, 3]  # NordsoenMidt, Sud_Atlantique, SicilySouth
+        site_ids = [0, 5, 3]
 
     selected_ids = list(site_ids)
     num_sites = len(selected_ids)
+
+    # Validation for manual names
+    if manual_site_names is not None:
+        manual_names = list(manual_site_names)
+        if len(manual_names) != num_sites:
+            raise ValueError("Number of manual names must match number of site IDs.")
 
     # Set figure size
     if figsize is None:
@@ -244,12 +214,17 @@ def plot_wind_speed_distribution(
     if num_sites == 1:
         axes = [axes]
 
-    for idx, (site_id, ax) in enumerate(zip(selected_ids, axes)):
+    for i, (site_id, ax) in enumerate(zip(selected_ids, axes)):
         if site_id not in input_ts_by_site:
             raise ValueError(f"Site ID {site_id} not found in loaded data")
 
         site_df = input_ts_by_site[site_id]
-        site_name = _format_site_name(str(examples_sites.loc[site_id, "name"]))
+        
+        # Site name logic: Manual vs Automatic
+        if manual_site_names is not None:
+            site_name = manual_names[i]
+        else:
+            site_name = _format_site_name(str(examples_sites.loc[site_id, "name"]))
 
         # Resolve wind column case-insensitively
         wind_col_res = _resolve_column(site_df, wind_col)
@@ -258,15 +233,24 @@ def plot_wind_speed_distribution(
         # Create histogram
         ax.hist(wind_data, bins=bins, color="steelblue", edgecolor="black", alpha=0.7)
 
-        # Add mean line
+        # Add mean line and label for the legend
         mean_val = wind_data.mean()
-        ax.axvline(mean_val, color="red", linestyle="--", linewidth=2)
+        ax.axvline(
+            mean_val, 
+            color="red", 
+            linestyle="--", 
+            linewidth=2,
+            label=f"Mean: {mean_val:.2f} m/s"
+        )
 
         # Formatting
         ax.set_xlabel("Wind Speed (m/s)", fontsize=10)
         ax.set_ylabel("Frequency (hours)", fontsize=10)
-        ax.set_title(f"{site_name} | Mean: {mean_val:.2f} m/s", fontsize=11)
+        ax.set_title(f"Site: {site_name}", fontsize=11, fontweight="bold")
         ax.grid(axis="y", alpha=0.3)
+
+        # Force legend to top right
+        ax.legend(loc="upper right", fontsize=9)
 
     fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)
     plt.tight_layout()
@@ -280,17 +264,110 @@ def plot_wind_speed_distribution(
 
     return fig, axes
 
+def plot_wind_speed_distribution(
+    site_ids: Optional[Iterable[int]] = None,
+    wind_col: str = "WS_150",
+    figsize: Optional[tuple] = None,
+    title: str = "Wind Speed Distribution",
+    bins: int = 30,
+    save_path: Optional[str] = None,
+    manual_site_names: Optional[Iterable[str]] = None,
+) -> tuple:
+    """
+    Create a figure with histograms of wind speed distributions with 
+    standardized x-axis (0-40, steps of 5) and top-right legends.
+    """
+    # Load data using your project's data loaders
+    examples_sites = load_examples_sites()
+    input_ts_by_site = load_input_timeseries()
+
+    if site_ids is None:
+        site_ids = [0, 5, 3]
+
+    selected_ids = list(site_ids)
+    num_sites = len(selected_ids)
+
+    # Validate manual names if provided
+    if manual_site_names is not None:
+        manual_names = list(manual_site_names)
+        if len(manual_names) != num_sites:
+            raise ValueError("Number of manual names must match number of site IDs.")
+
+    if figsize is None:
+        figsize = (4 * num_sites, 4)
+
+    fig, axes = plt.subplots(1, num_sites, figsize=figsize)
+    if num_sites == 1:
+        axes = [axes]
+
+    for i, (site_id, ax) in enumerate(zip(selected_ids, axes)):
+        if site_id not in input_ts_by_site:
+            raise ValueError(f"Site ID {site_id} not found in loaded data")
+
+        site_df = input_ts_by_site[site_id]
+        
+        # Site name logic
+        if manual_site_names is not None:
+            site_name = manual_names[i]
+        else:
+            # Fallback to internal formatter if no manual names
+            site_name = _format_site_name(str(examples_sites.loc[site_id, "name"]))
+
+        # Resolve column and clean data
+        wind_col_res = _resolve_column(site_df, wind_col)
+        wind_data = pd.to_numeric(site_df[wind_col_res], errors="coerce").dropna()
+
+        # Create histogram
+        ax.hist(wind_data, bins=bins, color="steelblue", edgecolor="black", alpha=0.7)
+
+        # Plot mean line
+        mean_val = wind_data.mean()
+        ax.axvline(
+            mean_val, 
+            color="red", 
+            linestyle="--", 
+            linewidth=2, 
+            label=f"Mean: {mean_val:.2f} m/s"
+        )
+
+        # --- X-AXIS STANDARDIZATION ---
+        ax.set_xlim(0, 40)  # Forces same scale for all subplots
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(5)) # Ticks at 0, 5, 10, etc.
+        # ------------------------------
+
+        # Formatting
+        ax.set_xlabel("Wind Speed at 150m (m/s)", fontsize=10)
+        ax.set_ylabel("Frequency (hours)", fontsize=10)
+        ax.set_title(f"Site: {site_name}", fontsize=11, fontweight="bold")
+        ax.grid(axis="y", alpha=0.3)
+        
+        # Legend at top right
+        ax.legend(loc="upper right", fontsize=9)
+
+    fig.suptitle(title, fontsize=14, fontweight="bold", y=1.05)
+    plt.tight_layout()
+
+    if save_path:
+        os.makedirs(save_path, exist_ok=True)
+        filename_base = os.path.join(save_path, "wind_speed_distribution")
+        fig.savefig(f"{filename_base}.png", dpi=300, bbox_inches="tight")
+        print(f"Plot saved to: {filename_base}.png")
+
+    return fig, axes
+
 
 def plot_solar_irradiance_distribution(
     site_ids: Optional[Iterable[int]] = None,
     solar_col: str = "ghi",
     figsize: Optional[tuple] = None,
-    title: str = "Solar irradiance distrubution",
+    title: str = "Solar Irradiance (GHI) Distribution",
     bins: int = 30,
     save_path: Optional[str] = None,
+    manual_site_names: Optional[Iterable[str]] = None,
 ) -> tuple:
     """
-    Create a figure with histograms of solar irradiance distributions.
+    Create a figure with histograms of solar irradiance distributions 
+    with mean values shown in a top-right legend.
     """
     examples_sites = load_examples_sites()
     input_ts_by_site = load_input_timeseries()
@@ -301,20 +378,29 @@ def plot_solar_irradiance_distribution(
     selected_ids = list(site_ids)
     num_sites = len(selected_ids)
 
+    if manual_site_names is not None:
+        manual_names = list(manual_site_names)
+        if len(manual_names) != num_sites:
+            raise ValueError("Number of manual names must match number of site IDs.")
+
     if figsize is None:
         figsize = (4 * num_sites, 4)
 
     fig, axes = plt.subplots(1, num_sites, figsize=figsize)
-
     if num_sites == 1:
         axes = [axes]
 
-    for site_id, ax in zip(selected_ids, axes):
+    for i, (site_id, ax) in enumerate(zip(selected_ids, axes)):
         if site_id not in input_ts_by_site:
             raise ValueError(f"Site ID {site_id} not found in loaded data")
 
         site_df = input_ts_by_site[site_id]
-        site_name = _format_site_name(str(examples_sites.loc[site_id, "name"]))
+        
+        # Site name logic
+        if manual_site_names is not None:
+            site_name = manual_names[i]
+        else:
+            site_name = _format_site_name(str(examples_sites.loc[site_id, "name"]))
 
         solar_col_res = _resolve_column(site_df, solar_col)
         solar_data = pd.to_numeric(site_df[solar_col_res], errors="coerce").dropna()
@@ -330,13 +416,24 @@ def plot_solar_irradiance_distribution(
             alpha=0.7,
         )
 
+        # Plot mean line and add label for the legend
         mean_val = solar_data.mean()
-        ax.axvline(mean_val, color="red", linestyle="--", linewidth=2)
+        ax.axvline(
+            mean_val, 
+            color="red", 
+            linestyle="--", 
+            linewidth=2, 
+            label=f"Mean: {mean_val:.2f} W/m^2"
+        )
 
-        ax.set_xlabel("Solar Irradiance (W/m^2)", fontsize=10)
+        # Formatting
+        ax.set_xlabel("Global Horizontal Irradiance (W/m^2)", fontsize=10)
         ax.set_ylabel("Frequency (hours)", fontsize=10)
-        ax.set_title(f"{site_name} | Mean: {mean_val:.2f} W/m^2", fontsize=11)
+        ax.set_title(f"Site: {site_name}", fontsize=11, fontweight="bold")
         ax.grid(axis="y", alpha=0.3)
+
+        # Force legend to top right
+        ax.legend(loc="upper right", fontsize=9)
 
     fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)
     plt.tight_layout()
@@ -345,73 +442,6 @@ def plot_solar_irradiance_distribution(
         os.makedirs(save_path, exist_ok=True)
         filename_base = os.path.join(save_path, "solar_irradiance_distribution")
         fig.savefig(f"{filename_base}.png", dpi=300, bbox_inches="tight")
-        print(f"Plot saved to:\n  {filename_base}.png")
-
-    return fig, axes
-
-
-def plot_price_distribution(
-    site_ids: Optional[Iterable[int]] = None,
-    price_col: str = "price",
-    figsize: Optional[tuple] = None,
-    title: str = "Price distrubution",
-    bins: int = 30,
-    save_path: Optional[str] = None,
-) -> tuple:
-    """
-    Create a figure with histograms of electricity price distributions.
-    """
-    examples_sites = load_examples_sites()
-    input_ts_by_site = load_input_timeseries()
-
-    if site_ids is None:
-        site_ids = [0, 5, 3]
-
-    selected_ids = list(site_ids)
-    num_sites = len(selected_ids)
-
-    if figsize is None:
-        figsize = (4 * num_sites, 4)
-
-    fig, axes = plt.subplots(1, num_sites, figsize=figsize)
-
-    if num_sites == 1:
-        axes = [axes]
-
-    for site_id, ax in zip(selected_ids, axes):
-        if site_id not in input_ts_by_site:
-            raise ValueError(f"Site ID {site_id} not found in loaded data")
-
-        site_df = input_ts_by_site[site_id]
-        site_name = _format_site_name(str(examples_sites.loc[site_id, "name"]))
-
-        price_col_res = _resolve_column(site_df, price_col)
-        price_data = pd.to_numeric(site_df[price_col_res], errors="coerce").dropna()
-
-        ax.hist(
-            price_data,
-            bins=bins,
-            color="seagreen",
-            edgecolor="black",
-            alpha=0.7,
-        )
-
-        mean_val = price_data.mean()
-        ax.axvline(mean_val, color="red", linestyle="--", linewidth=2)
-
-        ax.set_xlabel("Price (EUR/MW)", fontsize=10)
-        ax.set_ylabel("Frequency (hours)", fontsize=10)
-        ax.set_title(f"{site_name} | Mean: {mean_val:.2f} EUR/MW", fontsize=11)
-        ax.grid(axis="y", alpha=0.3)
-
-    fig.suptitle(title, fontsize=14, fontweight="bold", y=1.02)
-    plt.tight_layout()
-
-    if save_path:
-        os.makedirs(save_path, exist_ok=True)
-        filename_base = os.path.join(save_path, "price_distribution")
-        fig.savefig(f"{filename_base}.png", dpi=300, bbox_inches="tight")
-        print(f"Plot saved to:\n  {filename_base}.png")
 
     return fig, axes
 
@@ -424,9 +454,10 @@ def plot_daily_mean_wind_and_solar(
     target_year: int = 2012,
     title_prefix: str = "Daily Mean Wind Speed and Solar Irradiance",
     save_path: Optional[str] = None,
+    manual_site_names: Optional[Iterable[str]] = None,  # Added for manual control
 ) -> tuple:
     """
-    Create stacked time-series plots of daily mean wind speed and solar irradiance.
+    Create stacked time-series plots with custom site names and top-right legends.
     """
     examples_sites = load_examples_sites()
     input_ts_by_site = load_input_timeseries()
@@ -436,6 +467,12 @@ def plot_daily_mean_wind_and_solar(
 
     selected_ids = list(site_ids)
     num_sites = len(selected_ids)
+
+    # Convert manual_site_names to a list if provided
+    if manual_site_names is not None:
+        manual_names = list(manual_site_names)
+        if len(manual_names) != num_sites:
+            raise ValueError("Number of manual names must match number of site IDs.")
 
     if figsize is None:
         figsize = (12, 2.4 * num_sites)
@@ -452,7 +489,12 @@ def plot_daily_mean_wind_and_solar(
             raise ValueError(f"Site ID {site_id} not found in loaded data")
 
         site_df = input_ts_by_site[site_id].copy()
-        site_name = _format_site_name(str(examples_sites.loc[site_id, "name"]))
+        
+        # Logic to choose between manual and automatic names
+        if manual_site_names is not None:
+            site_name = manual_names[i]
+        else:
+            site_name = _format_site_name(str(examples_sites.loc[site_id, "name"]))
 
         wind_col_res = _resolve_column(site_df, wind_col)
         solar_col_res = _resolve_column(site_df, solar_col)
@@ -493,7 +535,7 @@ def plot_daily_mean_wind_and_solar(
             daily_year[solar_col_res],
             color=solar_color,
             linewidth=0.8,
-            label="Solar Irradiance",
+            label="GHI",
         )
         ax2.set_ylabel(
             "Daily Mean GHI (W/m^2)",
@@ -502,12 +544,18 @@ def plot_daily_mean_wind_and_solar(
         )
         ax2.tick_params(axis="y", labelcolor=solar_color, labelsize=7)
 
+        # Forced legend to top right
         line1 = ax1.get_lines()[0]
         line2 = ax2.get_lines()[0]
-        ax1.legend([line1, line2], ["Wind Speed", "Solar Irradiance"], fontsize=6)
+        ax1.legend(
+            [line1, line2], 
+            ["Wind Speed", "GHI"], 
+            fontsize=6,
+            loc="upper right"
+        )
 
         ax1.set_title(
-            f"{title_prefix} ({target_year}) | Site: {site_name}",
+            f"{title_prefix} | Site: {site_name}",
             fontsize=8,
             fontweight="bold",
         )
@@ -816,6 +864,17 @@ def plot_daily_mean_solar_and_price(
     )
 
 
+import os
+from typing import Iterable, Optional, Dict
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.lines as mlines
+
+# Assuming these helper functions are defined elsewhere, as in previous code
+# from HPP.HelperFunctions.DataLoader import load_examples_sites, load_input_timeseries
+# def _resolve_column(df, col): ...
+# def _format_site_name(name): ...
+
 def plot_mean_hourly_resource_and_price(
     site_ids: Optional[Iterable[int]] = None,
     wind_col: str = "WS_150",
@@ -824,8 +883,12 @@ def plot_mean_hourly_resource_and_price(
     figsize: Optional[tuple] = None,
     target_year: Optional[int] = None,
     save_path: Optional[str] = None,
+    manual_site_names: Optional[Iterable[str]] = None,
 ) -> tuple:
-    """Create side-by-side hourly mean wind-price and solar-price subplots."""
+    """
+    Create side-by-side hourly mean plots with custom academic styling.
+    Colors matched to provided sample image, markers removed, and refined labels.
+    """
     examples_sites = load_examples_sites()
     input_ts_by_site = load_input_timeseries()
 
@@ -833,159 +896,102 @@ def plot_mean_hourly_resource_and_price(
         site_ids = [0, 5, 3]
 
     selected_ids = list(site_ids)
-    if figsize is None:
-        figsize = (13, 4.8)
+    num_sites = len(selected_ids)
 
-    fig, axes = plt.subplots(1, 2, figsize=figsize, sharex=True)
-    ax_wind = axes[0]
-    ax_solar = axes[1]
+    if manual_site_names is not None:
+        manual_names = list(manual_site_names)
+        if len(manual_names) != num_sites:
+            raise ValueError("Number of manual names must match number of site IDs.")
+
+    if figsize is None:
+        figsize = (13, 5.5)
+
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+    ax_wind, ax_solar = axes[0], axes[1]
     ax_wind_price = ax_wind.twinx()
     ax_solar_price = ax_solar.twinx()
 
-    site_colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
+    # CUSTOM COLORS FROM SAMPLE IMAGE
+    # Light Teal/Cyan, Mid Blue, Muted Brown/Copper
+    site_colors = ["#43D1D9", "#4B86C2", "#9C7667"]
+    
     hours = list(range(24))
-
-    wind_handles = []
-    wind_labels = []
-    solar_handles = []
-    solar_labels = []
+    site_handles = []
 
     for i, site_id in enumerate(selected_ids):
         if site_id not in input_ts_by_site:
-            raise ValueError(f"Site ID {site_id} not found in loaded data")
-
+            continue
+            
         color = site_colors[i % len(site_colors)]
         site_df = input_ts_by_site[site_id].copy()
-        site_name = _format_site_name(str(examples_sites.loc[site_id, "name"]))
+        
+        # Site name logic
+        site_name = manual_names[i] if manual_site_names else _format_site_name(str(examples_sites.loc[site_id, "name"]))
 
+        # Data processing
         wind_col_res = _resolve_column(site_df, wind_col)
         solar_col_res = _resolve_column(site_df, solar_col)
         price_col_res = _resolve_column(site_df, price_col)
 
         if not isinstance(site_df.index, pd.DatetimeIndex):
-            site_df.index = pd.to_datetime(
-                site_df.index,
-                errors="coerce",
-                dayfirst=True,
-            )
-        site_df = site_df[site_df.index.notna()]
+            site_df.index = pd.to_datetime(site_df.index, errors="coerce", dayfirst=True)
+        
+        period_df = site_df[site_df.index.year == target_year].copy() if target_year else site_df
+        hourly = period_df[[wind_col_res, solar_col_res, price_col_res]].apply(pd.to_numeric, errors='coerce').groupby(period_df.index.hour).mean().reindex(hours)
 
-        if target_year is None:
-            period_df = site_df.copy()
-        else:
-            period_df = site_df[site_df.index.year == target_year].copy()
-            if period_df.empty:
-                raise ValueError(
-                    f"No data available for year {target_year} at site '{site_name}'"
-                )
+        # Plot Wind & Solar (Solid lines, NO markers)
+        ax_wind.plot(hours, hourly[wind_col_res], color=color, linewidth=2.0, marker=None)
+        ax_solar.plot(hours, hourly[solar_col_res], color=color, linewidth=2.0, marker=None)
 
-        for col in [wind_col_res, solar_col_res, price_col_res]:
-            period_df[col] = pd.to_numeric(period_df[col], errors="coerce")
+        # Plot Price (Dotted/Dashed lines, NO markers)
+        ax_wind_price.plot(hours, hourly[price_col_res], color=color, linestyle='--', linewidth=1.5, alpha=0.7, marker=None)
+        ax_solar_price.plot(hours, hourly[price_col_res], color=color, linestyle='--', linewidth=1.5, alpha=0.7, marker=None)
 
-        hourly = period_df[[wind_col_res, solar_col_res, price_col_res]].groupby(
-            period_df.index.hour
-        ).mean()
-        hourly = hourly.reindex(hours)
+        site_handles.append(mlines.Line2D([], [], color=color, linewidth=2, label=site_name))
 
-        wind_line = ax_wind.plot(
-            hours,
-            hourly[wind_col_res],
-            color=color,
-            linewidth=1.8,
-            label=f"{site_name} Wind",
-        )[0]
-        wind_price_line = ax_wind_price.plot(
-            hours,
-            hourly[price_col_res],
-            color=color,
-            linestyle="--",
-            linewidth=1.4,
-            alpha=0.8,
-            label=f"{site_name} Price",
-        )[0]
+    # --- ACADEMIC FORMATTING ---
+    ax_wind.set_ylabel("Mean Wind Speed at 150m [m/s]", fontweight="bold", fontsize=9)
+    ax_solar.set_ylabel("Mean GHI [W/m²]", fontweight="bold", fontsize=9)
+    ax_solar_price.set_ylabel("Mean Electricity Price [€/MWh]", fontweight="bold", fontsize=9)
+    
+    # ACADEMIC TITLES
+    ax_wind.set_title("Diurnal Profiles of Wind Speed and Price", fontweight="bold", fontsize=10)
+    ax_solar.set_title("Diurnal Profiles of Solar Irradiance and Price", fontweight="bold", fontsize=10)
 
-        solar_line = ax_solar.plot(
-            hours,
-            hourly[solar_col_res],
-            color=color,
-            linewidth=1.8,
-            label=f"{site_name} Solar",
-        )[0]
-        solar_price_line = ax_solar_price.plot(
-            hours,
-            hourly[price_col_res],
-            color=color,
-            linestyle="--",
-            linewidth=1.4,
-            alpha=0.8,
-            label=f"{site_name} Price",
-        )[0]
+    for ax in [ax_wind, ax_solar]:
+        ax.grid(True, linestyle=":", linewidth=0.5, alpha=0.7)
+        ax.set_xlabel("Hour of Day", fontweight="bold", fontsize=9)
+        
+        # SHOW EVERY SECOND HOUR (0, 2, 4...)
+        ax.set_xticks(hours[::2]) 
+        ax.set_xlim(0, 23)
 
-        wind_handles.extend([wind_line, wind_price_line])
-        wind_labels.extend([f"{site_name} Wind", f"{site_name} Price"])
-        solar_handles.extend([solar_line, solar_price_line])
-        solar_labels.extend([f"{site_name} Solar", f"{site_name} Price"])
-
-    title_suffix = f" ({target_year})" if target_year is not None else ""
-    ax_wind.set_title(
-        f"Mean Hourly Wind Speed and Mean Hourly Price {title_suffix}",
-        fontsize=10,
-        fontweight="bold",
-    )
-    ax_wind.set_ylabel("Wind Speed (m/s)", fontsize=9)
-    ax_wind_price.set_ylabel("Price (EUR/MW)", fontsize=9, color="seagreen")
-    ax_wind_price.tick_params(axis="y", labelcolor="seagreen")
-    ax_wind.grid(True, linestyle="-", linewidth=0.4, alpha=0.3)
-    ax_solar.set_title(
-        f"Mean Hourly Solar Irradiance and Mean Hourly Price {title_suffix}",
-        fontsize=10,
-        fontweight="bold",
-    )
-    ax_solar.set_ylabel("Solar Irradiance (W/m^2)", fontsize=9)
-    ax_solar_price.set_ylabel("Price (EUR/MW)", fontsize=9, color="seagreen")
-    ax_solar_price.tick_params(axis="y", labelcolor="seagreen")
-    ax_solar.grid(True, linestyle="-", linewidth=0.4, alpha=0.3)
-    combined_handles = wind_handles + solar_handles
-    combined_labels = wind_labels + solar_labels
-    unique_handles = []
-    unique_labels = []
-    seen_labels = set()
-    for handle, label in zip(combined_handles, combined_labels):
-        if label in seen_labels:
-            continue
-        seen_labels.add(label)
-        unique_handles.append(handle)
-        unique_labels.append(label)
-
+    # --- LEGEND CONSTRUCTION ---
+    resource_proxy = mlines.Line2D([], [], color='#555555', linestyle='-', label='Resource (Wind/Solar)')
+    price_proxy = mlines.Line2D([], [], color='#555555', linestyle='--', label='Electricity Price')
+    
+    fig.subplots_adjust(bottom=0.25, wspace=0.35)
+    
+    all_handles = site_handles + [resource_proxy, price_proxy]
+    
     fig.legend(
-        unique_handles,
-        unique_labels,
-        fontsize=7,
-        ncol=min(4, len(unique_labels)),
+        handles=all_handles,
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.01),
+        bbox_to_anchor=(0.5, 0.05),
+        ncol=len(site_handles) + 1, 
+        frameon=False,
+        fontsize=8
     )
-
-    ax_wind.set_xlabel("Hour of Day", fontsize=9, fontweight="bold")
-    ax_solar.set_xlabel("Hour of Day", fontsize=9, fontweight="bold")
-    ax_solar.set_xticks(hours)
-    ax_solar.set_xlim(0, 23)
-    ax_wind.set_xticks(hours)
-    ax_wind.set_xlim(0, 23)
-    fig.subplots_adjust(bottom=0.30, wspace=0.28)
 
     if save_path:
         os.makedirs(save_path, exist_ok=True)
-        filename_base = os.path.join(
-            save_path,
-            "mean_hourly_wind_price_and_solar_price_by_site",
-        )
-        fig.savefig(f"{filename_base}.png", dpi=300, bbox_inches="tight")
-        print(f"Plot saved to:\n  {filename_base}.png")
+        fig.savefig(os.path.join(save_path, "academic_hourly_profiles.png"), dpi=300, bbox_inches="tight")
 
     return fig, axes
 
-def plot_mean_monthly_resource_and_price(
+
+
+def plot_mean_hourly_resource_and_price(
     site_ids: Optional[Iterable[int]] = None,
     wind_col: str = "WS_150",
     solar_col: str = "ghi",
@@ -993,8 +999,16 @@ def plot_mean_monthly_resource_and_price(
     figsize: Optional[tuple] = None,
     target_year: Optional[int] = None,
     save_path: Optional[str] = None,
+    manual_site_names: Optional[Iterable[str]] = None,
 ) -> tuple:
-    """Create side-by-side monthly mean wind-price and solar-price subplots."""
+    """
+    Academic Diurnal Profile Plot.
+    - Solid lines for resources, dashed for price.
+    - No markers.
+    - Colors matched to teal, blue, and copper palette.
+    - Every second hour labeled on X-axis.
+    """
+    # Load data
     examples_sites = load_examples_sites()
     input_ts_by_site = load_input_timeseries()
 
@@ -1002,158 +1016,103 @@ def plot_mean_monthly_resource_and_price(
         site_ids = [0, 5, 3]
 
     selected_ids = list(site_ids)
-    if figsize is None:
-        figsize = (13, 4.8)
+    num_sites = len(selected_ids)
 
-    fig, axes = plt.subplots(1, 2, figsize=figsize, sharex=True)
-    ax_wind = axes[0]
-    ax_solar = axes[1]
+    # Handle manual names passed in the function call
+    if manual_site_names is not None:
+        manual_names = list(manual_site_names)
+        if len(manual_names) != num_sites:
+            raise ValueError("Number of manual names must match number of site IDs.")
+
+    if figsize is None:
+        figsize = (13, 5.5)
+
+    fig, axes = plt.subplots(1, 2, figsize=figsize)
+    ax_wind, ax_solar = axes[0], axes[1]
     ax_wind_price = ax_wind.twinx()
     ax_solar_price = ax_solar.twinx()
 
-    site_colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
-    months = list(range(1, 13))
-
-    wind_handles = []
-    wind_labels = []
-    solar_handles = []
-    solar_labels = []
+    # ACADEMIC COLOR PALETTE (Teal, Blue, Copper)
+    site_colors = ["#43D1D9", "#4B86C2", "#9C7667"]
+    hours = list(range(24))
+    site_handles = []
 
     for i, site_id in enumerate(selected_ids):
         if site_id not in input_ts_by_site:
-            raise ValueError(f"Site ID {site_id} not found in loaded data")
-
+            continue
+            
         color = site_colors[i % len(site_colors)]
         site_df = input_ts_by_site[site_id].copy()
-        site_name = _format_site_name(str(examples_sites.loc[site_id, "name"]))
+        
+        # Site name logic
+        if manual_site_names is not None:
+            site_name = manual_names[i]
+        else:
+            site_name = _format_site_name(str(examples_sites.loc[site_id, "name"]))
 
+        # Column resolution
         wind_col_res = _resolve_column(site_df, wind_col)
         solar_col_res = _resolve_column(site_df, solar_col)
         price_col_res = _resolve_column(site_df, price_col)
 
         if not isinstance(site_df.index, pd.DatetimeIndex):
-            site_df.index = pd.to_datetime(
-                site_df.index,
-                errors="coerce",
-                dayfirst=True,
-            )
-        site_df = site_df[site_df.index.notna()]
+            site_df.index = pd.to_datetime(site_df.index, errors="coerce", dayfirst=True)
+        
+        # Data Filtering and Resampling
+        period_df = site_df[site_df.index.year == target_year].copy() if target_year else site_df
+        hourly = period_df[[wind_col_res, solar_col_res, price_col_res]].apply(pd.to_numeric, errors='coerce').groupby(period_df.index.hour).mean().reindex(hours)
 
-        if target_year is None:
-            period_df = site_df.copy()
-        else:
-            period_df = site_df[site_df.index.year == target_year].copy()
-            if period_df.empty:
-                raise ValueError(
-                    f"No data available for year {target_year} at site '{site_name}'"
-                )
+        # Plot Wind & Solar (Solid lines, No markers)
+        ax_wind.plot(hours, hourly[wind_col_res], color=color, linewidth=2.0, marker=None)
+        ax_solar.plot(hours, hourly[solar_col_res], color=color, linewidth=2.0, marker=None)
 
-        for col in [wind_col_res, solar_col_res, price_col_res]:
-            period_df[col] = pd.to_numeric(period_df[col], errors="coerce")
+        # Plot Price (Dashed lines, No markers)
+        ax_wind_price.plot(hours, hourly[price_col_res], color=color, linestyle='--', linewidth=1.5, alpha=0.7, marker=None)
+        ax_solar_price.plot(hours, hourly[price_col_res], color=color, linestyle='--', linewidth=1.5, alpha=0.7, marker=None)
 
-        monthly = period_df[[wind_col_res, solar_col_res, price_col_res]].groupby(
-            period_df.index.month
-        ).mean()
-        monthly = monthly.reindex(months)
+        # Create handles for the site legend
+        site_handles.append(mlines.Line2D([], [], color=color, linewidth=2, label=site_name))
 
-        wind_line = ax_wind.plot(
-            months,
-            monthly[wind_col_res],
-            color=color,
-            linewidth=1.8,
-            label=f"{site_name} Wind",
-        )[0]
-        wind_price_line = ax_wind_price.plot(
-            months,
-            monthly[price_col_res],
-            color=color,
-            linestyle="--",
-            linewidth=1.4,
-            alpha=0.8,
-            label=f"{site_name} Price",
-        )[0]
+    # --- ACADEMIC FORMATTING ---
+    ax_wind.set_ylabel("Mean Wind Speed at 150m [m/s]", fontweight="bold", fontsize=9)
+    ax_solar.set_ylabel("Mean GHI [W/m²]", fontweight="bold", fontsize=9)
+    ax_solar_price.set_ylabel("Mean Electricity Price [€/MWh]", fontweight="bold", fontsize=9)
+    
+    # ACADEMIC TITLES
+    ax_wind.set_title("Diurnal Profiles of Wind Speed and Electricity Price", fontweight="bold", fontsize=10)
+    ax_solar.set_title("Diurnal Profiles of Solar Irradiance and Electricity Price", fontweight="bold", fontsize=10)
 
-        solar_line = ax_solar.plot(
-            months,
-            monthly[solar_col_res],
-            color=color,
-            linewidth=1.8,
-            label=f"{site_name} Solar",
-        )[0]
-        solar_price_line = ax_solar_price.plot(
-            months,
-            monthly[price_col_res],
-            color=color,
-            linestyle="--",
-            linewidth=1.4,
-            alpha=0.8,
-            label=f"{site_name} Price",
-        )[0]
+    for ax in [ax_wind, ax_solar]:
+        ax.grid(True, linestyle=":", linewidth=0.5, alpha=0.7)
+        ax.set_xlabel("Hour of Day", fontweight="bold", fontsize=9)
+        
+        # Labels for every second hour: 0, 2, 4, ..., 22
+        ax.set_xticks(hours[::2]) 
+        ax.set_xlim(0, 23)
 
-        wind_handles.extend([wind_line, wind_price_line])
-        wind_labels.extend([f"{site_name} Wind", f"{site_name} Price"])
-        solar_handles.extend([solar_line, solar_price_line])
-        solar_labels.extend([f"{site_name} Solar", f"{site_name} Price"])
-
-    title_suffix = f" ({target_year})" if target_year is not None else ""
-    ax_wind.set_title(
-        f"Mean Monthly Wind Speed and Mean Monthly Price{title_suffix}",
-        fontsize=10,
-        fontweight="bold",
-    )
-    ax_wind.set_ylabel("Wind Speed (m/s)", fontsize=9)
-    ax_wind_price.set_ylabel("Price (EUR/MW)", fontsize=9, color="seagreen")
-    ax_wind_price.tick_params(axis="y", labelcolor="seagreen")
-    ax_wind.grid(True, linestyle="-", linewidth=0.4, alpha=0.3)
-    ax_solar.set_title(
-        f"Mean Monthly Solar Irradiance and Mean Monthly Price{title_suffix}",
-        fontsize=10,
-        fontweight="bold",
-    )
-    ax_solar.set_ylabel("Solar Irradiance (W/m^2)", fontsize=9)
-    ax_solar_price.set_ylabel("Price (EUR/MW)", fontsize=9, color="seagreen")
-    ax_solar_price.tick_params(axis="y", labelcolor="seagreen")
-    ax_solar.grid(True, linestyle="-", linewidth=0.4, alpha=0.3)
-    combined_handles = wind_handles + solar_handles
-    combined_labels = wind_labels + solar_labels
-    unique_handles = []
-    unique_labels = []
-    seen_labels = set()
-    for handle, label in zip(combined_handles, combined_labels):
-        if label in seen_labels:
-            continue
-        seen_labels.add(label)
-        unique_handles.append(handle)
-        unique_labels.append(label)
-
+    # --- SINGLE LINE LEGEND ---
+    resource_proxy = mlines.Line2D([], [], color='#555555', linestyle='-', label='Resource (Wind/Solar)')
+    price_proxy = mlines.Line2D([], [], color='#555555', linestyle='--', label='Price (Electricity)')
+    
+    all_handles = site_handles + [resource_proxy, price_proxy]
+    
+    fig.subplots_adjust(bottom=0.2, wspace=0.35)
+    
     fig.legend(
-        unique_handles,
-        unique_labels,
-        fontsize=7,
-        ncol=min(4, len(unique_labels)),
+        handles=all_handles,
         loc="lower center",
-        bbox_to_anchor=(0.5, 0.01),
+        bbox_to_anchor=(0.5, 0.02),
+        ncol=len(all_handles), # This forces everything onto one line
+        frameon=False,
+        fontsize=8,
+        columnspacing=1.0 # Adjusts space between the items to fit nicely
     )
-
-    month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    ax_wind.set_xlabel("Month", fontsize=9, fontweight="bold")
-    ax_solar.set_xlabel("Month", fontsize=9, fontweight="bold")
-    ax_wind.set_xticks(months)
-    ax_wind.set_xticklabels(month_labels)
-    ax_wind.set_xlim(1, 12)
-    ax_solar.set_xticks(months)
-    ax_solar.set_xticklabels(month_labels)
-    ax_solar.set_xlim(1, 12)
-    fig.subplots_adjust(bottom=0.30, wspace=0.28)
 
     if save_path:
         os.makedirs(save_path, exist_ok=True)
-        filename_base = os.path.join(
-            save_path,
-            "mean_monthly_wind_price_and_solar_price_by_site",
-        )
-        fig.savefig(f"{filename_base}.png", dpi=300, bbox_inches="tight")
-        print(f"Plot saved to:\n  {filename_base}.png")
+        save_file = os.path.join(save_path, "diurnal_resource_price_profiles.png")
+        fig.savefig(save_file, dpi=300, bbox_inches="tight")
+        print(f"Plot saved to: {save_file}")
 
     return fig, axes
 
@@ -1261,32 +1220,531 @@ def plot_all_sites_scatterhist_resource_vs_price(
     return fig, axes
 
 
-     
+def plot_monthly_market_prices(
+    site_ids: Optional[Iterable[int]] = None,
+    price_col: str = "price",
+    figsize: Optional[tuple] = (12, 6),
+    save_path: Optional[str] = None,
+    manual_site_names: Optional[Iterable[str]] = None,
+) -> tuple:
+    """
+    Create a monthly mean price plot with error bars.
+    Matches the academic styling of the diurnal profile plots.
+    """
+    # 1. Load data
+    examples_sites = load_examples_sites()
+    input_ts_by_site = load_input_timeseries()
 
+    if site_ids is None:
+        site_ids = [0, 5, 3]
+
+    selected_ids = list(site_ids)
+    num_sites = len(selected_ids)
+
+    if manual_site_names is not None:
+        manual_names = list(manual_site_names)
+        if len(manual_names) != num_sites:
+            raise ValueError("Number of manual names must match number of site IDs.")
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # ACADEMIC COLOR PALETTE (Teal, Blue, Copper)
+    site_colors = ["#43D1D9", "#4B86C2", "#9C7667"]
+    month_labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+    months = np.arange(1, 13)
+    
+    site_handles = []
+
+    for i, site_id in enumerate(selected_ids):
+        if site_id not in input_ts_by_site:
+            continue
+            
+        color = site_colors[i % len(site_colors)]
+        site_df = input_ts_by_site[site_id].copy()
+        
+        # Site name logic
+        site_name = manual_names[i] if manual_site_names else _format_site_name(str(examples_sites.loc[site_id, "name"]))
+
+        # Column resolution and numeric cleaning
+        price_col_res = _resolve_column(site_df, price_col)
+        site_df[price_col_res] = pd.to_numeric(site_df[price_col_res], errors="coerce")
+
+        if not isinstance(site_df.index, pd.DatetimeIndex):
+            site_df.index = pd.to_datetime(site_df.index, errors="coerce", dayfirst=True)
+        
+        # Calculate Monthly Mean and Standard Deviation (for error bars)
+        monthly_stats = site_df.groupby(site_df.index.month)[price_col_res].agg(['mean', 'std']).reindex(months)
+        
+        # Plot Line with Error Bars
+        ax.errorbar(
+            months, monthly_stats['mean'], yerr=monthly_stats['std'],
+            label=site_name, color=color, fmt='-o', markersize=6, 
+            linewidth=2, capsize=4, elinewidth=1, alpha=0.9
+        )
+
+        # Store mean for legend display (matching your image's legend style)
+        overall_mean = site_df[price_col_res].mean()
+        site_handles.append(mlines.Line2D([], [], color=color, marker='o', 
+                           linewidth=2, label=f"{site_name} (Mean: {overall_mean:.2f} €/MWh)"))
+
+    # --- ACADEMIC FORMATTING ---
+    ax.set_ylabel("Day-Ahead Market Price [€/MWh]", fontweight="bold", fontsize=10)
+    ax.set_xlabel("Month", fontweight="bold", fontsize=10)
+    ax.set_title("Monthly Variations in Long-Term Mean Day-Ahead Market Prices", 
+                 fontweight="bold", fontsize=12, pad=15)
+
+    # Set X-Ticks to Months
+    ax.set_xticks(months)
+    ax.set_xticklabels(month_labels)
+    ax.set_xlim(0.5, 12.5)
+
+    # Dotted Grid
+    ax.grid(True, linestyle=":", linewidth=0.5, alpha=0.7)
+
+# --- SINGLE LINE LEGEND ---
+    fig.subplots_adjust(bottom=0.2) # Make room at bottom
+    ax.legend(
+        handles=site_handles,
+        loc="upper center",
+        bbox_to_anchor=(0.5, -0.15),
+        ncol=len(site_handles), # Forces all sites onto one line
+        frameon=False,
+        fontsize=8.5,
+        columnspacing=1.0 # Adjust spacing between items
+    )
+
+    if save_path:
+        os.makedirs(save_path, exist_ok=True)
+        fig.savefig(os.path.join(save_path, "monthly_market_prices.png"), dpi=300, bbox_inches="tight")
+
+    return fig, ax
+
+
+def plot_monthly_mean_price_timeseries(
+    site_ids: Optional[Iterable[int]] = None,
+    price_col: str = "price",
+    figsize: Optional[tuple] = (12, 10),
+    save_path: Optional[str] = None,
+    manual_site_names: Optional[Iterable[str]] = None,
+) -> tuple:
+    """
+    Historical Monthly Mean Price Plot.
+    - Centered titles.
+    - Colors: Teal (#43D1D9), Blue (#4B86C2), Copper (#9C7667).
+    """
+    examples_sites = load_examples_sites()
+    input_ts_by_site = load_input_timeseries()
+
+    if site_ids is None:
+        site_ids = [0, 5, 3]
+
+    selected_ids = list(site_ids)
+    num_sites = len(selected_ids)
+
+    if manual_site_names is not None:
+        manual_names = list(manual_site_names)
+        if len(manual_names) != num_sites:
+            raise ValueError("Number of manual names must match number of site IDs.")
+
+    fig, axes = plt.subplots(num_sites, 1, figsize=figsize, sharex=True)
+    if num_sites == 1:
+        axes = [axes]
+
+    # THE COLORS FROM YOUR IMAGE
+    site_colors = ["#43D1D9", "#4B86C2", "#9C7667"]
+
+    for i, (site_id, ax) in enumerate(zip(selected_ids, axes)):
+        if site_id not in input_ts_by_site:
+            continue
+            
+        color = site_colors[i % len(site_colors)]
+        site_df = input_ts_by_site[site_id].copy()
+        
+        # Manual name logic
+        site_name = manual_names[i] if manual_site_names else _format_site_name(str(examples_sites.loc[site_id, "name"]))
+
+        price_col_res = _resolve_column(site_df, price_col)
+        site_df[price_col_res] = pd.to_numeric(site_df[price_col_res], errors="coerce")
+
+        if not isinstance(site_df.index, pd.DatetimeIndex):
+            site_df.index = pd.to_datetime(site_df.index, errors="coerce", dayfirst=True)
+        
+        # Monthly Resampling
+        monthly_df = site_df[price_col_res].resample('MS').mean()
+        overall_mean = monthly_df.mean()
+        overall_std = monthly_df.std()
+
+        # Plot line
+        ax.plot(monthly_df.index, monthly_df, color=color, linewidth=1.5, alpha=0.9)
+        
+        # Add shaded area for volatility (std dev)
+        ax.fill_between(monthly_df.index, monthly_df - overall_std, monthly_df + overall_std, 
+                        color=color, alpha=0.15)
+
+        # --- CENTERED TITLE ---
+        ax.set_title(f"{site_name} Mean: {overall_mean:.2f} €/MWh, Std Dev: {overall_std:.2f} €/MWh", 
+                     fontsize=10, fontweight="bold", loc='center', pad=10)
+
+        # Formatting
+        ax.set_ylabel("Price [€/MWh]", fontweight="bold", fontsize=9)
+        ax.grid(True, linestyle=":", linewidth=0.5, alpha=0.7)
+
+    axes[-1].set_xlabel("Year", fontweight="bold", fontsize=10)
+    fig.suptitle("Monthly Mean Day-Ahead Market Price Variations", 
+                 fontsize=12, fontweight="bold", y=0.98)
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+    if save_path:
+        os.makedirs(save_path, exist_ok=True)
+        save_file = os.path.join(save_path, "monthly_mean_price_timeseries.png")
+        fig.savefig(save_file, dpi=300, bbox_inches="tight")
+
+    return fig, axes
+
+def plot_normalized_annual_resource_availability(
+    site_ids: Optional[Iterable[int]] = None,
+    wind_col: str = "WS_150",
+    solar_col: str = "ghi",
+    price_col: str = "price",
+    figsize: tuple = (12, 6),
+    save_path: Optional[str] = None,
+    manual_site_names: Optional[Iterable[str]] = None,
+) -> tuple:
+    """
+    Plots normalized annual mean wind, solar, and price.
+    Colors and styling matched to reference images.
+    """
+    examples_sites = load_examples_sites()
+    input_ts_by_site = load_input_timeseries()
+
+    if site_ids is None:
+        site_ids = [12]
+    selected_ids = list(site_ids)
+    
+    if manual_site_names is not None:
+        manual_names = list(manual_site_names)
+    else:
+        manual_names = [_format_site_name(str(examples_sites.loc[sid, "name"])) for sid in selected_ids]
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # EXACT COLORS FROM YOUR REFERENCE
+    # Teal: #61d9d9 (HPP/Combined)
+    # Blue: #6091cf (Solar)
+    # Brown: #a68b7c (Wind)
+    # Price: #2e7d32 (Academic Green)
+    
+    color_wind = "#43D1D9"
+    color_solar = "#4B86C2"
+    color_price = "#9C7667" 
+
+    for i, site_id in enumerate(selected_ids):
+        if site_id not in input_ts_by_site: continue
+            
+        site_df = input_ts_by_site[site_id].copy()
+        site_name = manual_names[i]
+
+        if not isinstance(site_df.index, pd.DatetimeIndex):
+            site_df.index = pd.to_datetime(site_df.index, errors="coerce", dayfirst=True)
+        
+        # Column Resolution
+        w_res = _resolve_column(site_df, wind_col)
+        s_res = _resolve_column(site_df, solar_col)
+        p_res = _resolve_column(site_df, price_col)
+
+        # Annual Resampling
+        cols = [w_res, s_res, p_res]
+        annual = site_df[cols].apply(pd.to_numeric, errors='coerce').resample('YE').mean()
+        
+        # Normalization (Value / Mean)
+        norm = annual / annual.mean()
+
+        # PLOTTING WITH MATCHED STYLES
+        # Wind (Brown, solid, circle)
+        ax.plot(norm.index.year, norm[w_res], color=color_wind, 
+                linestyle='-', marker='o', markersize=6, linewidth=1.5, label='Wind')
+        
+        # Solar (Blue, solid, square - adjusted from reference)
+        ax.plot(norm.index.year, norm[s_res], color=color_solar, 
+                linestyle='-', marker='o', markersize=5, linewidth=1.5, label='Solar')
+        
+        # Price (Green, dotted, triangle)
+        ax.plot(norm.index.year, norm[p_res], color=color_price, 
+                linestyle='-', marker='o', markersize=6, linewidth=1.2, alpha=0.8, label='Price')
+
+    # --- ACADEMIC FORMATTING ---
+    ax.axhline(1.0, color='#333333', lw=1.0, linestyle='-', alpha=0.5)
+    
+    ax.set_ylabel("Normalized Annual Index", fontweight="bold", fontsize=10)
+    ax.set_xlabel("Scenario Year", fontweight="bold", fontsize=10)
+    ax.set_title(f"Annual Resource & Price Variability: {manual_names[0]}", 
+                 fontweight="bold", fontsize=14, pad=20, color="#2c3e50")
+    
+    # Show every year on the x-axis
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+
+    # 2. Format labels to show only the last two digits (e.g., 1982 -> 82)
+    def format_year(x, pos):
+        return f"{int(x) % 100:02d}"
+    
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_year))
+    ax.set_xlim(1981.5, 2015.5)
+
+    
+    # Optional: Rotate labels if they overlap
+    plt.xticks(rotation=45, fontsize=8) 
+
+    ax.tick_params(axis='x', labelsize=8.5)
+    ax.set_xlabel("Scenario Year", fontweight="bold", fontsize=10)
+      
+
+    # Matching the grid style from reference
+    ax.grid(True, which='both', linestyle=':', linewidth=0.5, color='#d3d3d3')
+    ax.set_facecolor('#fafafa')
+
+    # --- SINGLE LINE LEGEND ---
+    # Proxies for the legend to ensure clean labels
+    wind_p = mlines.Line2D([], [], color=color_wind, marker='o', label='Wind Speed')
+    solar_p = mlines.Line2D([], [], color=color_solar, marker='o', label='Solar Irradiance')
+    price_p = mlines.Line2D([], [], color=color_price, ls='-', marker='o', label='Electricity Price')
+    
+    ax.legend(handles=[wind_p, solar_p, price_p], loc='lower center', 
+              bbox_to_anchor=(0.5, -0.22), ncol=3, frameon=False, fontsize=9)
+
+    plt.tight_layout()
+
+    if save_path:
+        os.makedirs(save_path, exist_ok=True)
+        filename = os.path.join(save_path, "annual_indexed_variability_SudAtlantique.png")
+        fig.savefig(filename, dpi=300, bbox_inches="tight")
+        print(f"Plot saved to: {filename}")
+
+    return fig, ax
+
+
+def plot_normalized_annual_wind_solar_availability(
+    site_ids: Optional[Iterable[int]] = None,
+    wind_col: str = "WS_150",
+    solar_col: str = "ghi",
+    figsize: tuple = (12, 6),
+    save_path: Optional[str] = None,
+    manual_site_names: Optional[Iterable[str]] = None,
+) -> tuple:
+    """
+    Plots normalized annual mean wind and solar resource availability only.
+    Colors and styling matched to reference images.
+    """
+    examples_sites = load_examples_sites()
+    input_ts_by_site = load_input_timeseries()
+
+    if site_ids is None:
+        site_ids = [12]
+    selected_ids = list(site_ids)
+    
+    if manual_site_names is not None:
+        manual_names = list(manual_site_names)
+    else:
+        manual_names = [_format_site_name(str(examples_sites.loc[sid, "name"])) for sid in selected_ids]
+
+    fig, ax = plt.subplots(figsize=figsize)
+
+    # Academic Palette
+    color_wind = "#43D1D9"   # Teal
+    color_solar = "#4B86C2"  # Blue
+
+    for i, site_id in enumerate(selected_ids):
+        if site_id not in input_ts_by_site: continue
+            
+        site_df = input_ts_by_site[site_id].copy()
+        
+        if not isinstance(site_df.index, pd.DatetimeIndex):
+            site_df.index = pd.to_datetime(site_df.index, errors="coerce", dayfirst=True)
+        
+        # Column Resolution
+        w_res = _resolve_column(site_df, wind_col)
+        s_res = _resolve_column(site_df, solar_col)
+
+        # Annual Resampling (Wind and Solar only)
+        cols = [w_res, s_res]
+        annual = site_df[cols].apply(pd.to_numeric, errors='coerce').resample('YE').mean()
+        
+        # Normalization (Value / Mean)
+        norm = annual / annual.mean()
+
+        # PLOTTING
+        # Wind (Teal, solid, circle)
+        ax.plot(norm.index.year, norm[w_res], color=color_wind, 
+                linestyle='-', marker='o', markersize=6, linewidth=1.5, label='Wind')
+        
+        # Solar (Blue, solid, circle)
+        ax.plot(norm.index.year, norm[s_res], color=color_solar, 
+                linestyle='-', marker='o', markersize=6, linewidth=1.5, label='Solar')
+
+    # --- ACADEMIC FORMATTING ---
+    ax.axhline(1.0, color='#333333', lw=1.0, linestyle='-', alpha=0.5)
+    
+    ax.set_ylabel("Normalized Annual Index", fontweight="bold", fontsize=10)
+    ax.set_title(f"Annual Resource Variability: {manual_names[0]}", 
+                 fontweight="bold", fontsize=14, pad=20, color="#2c3e50")
+    
+    # X-Axis Formatting: Every year, two digits
+    ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+    
+    def format_year(x, pos):
+        return f"{int(x) % 100:02d}"
+    
+    ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_year))
+    ax.set_xlim(1981.5, 2015.5)
+    
+    plt.xticks(rotation=45, fontsize=8.5) 
+    ax.set_xlabel("Scenario Year", fontweight="bold", fontsize=10)
+
+    # Grid and background
+    ax.grid(True, which='both', linestyle=':', linewidth=0.5, color='#d3d3d3')
+    ax.set_facecolor('#fafafa')
+
+    # --- SINGLE LINE LEGEND ---
+    wind_p = mlines.Line2D([], [], color=color_wind, marker='o', label='Wind Speed')
+    solar_p = mlines.Line2D([], [], color=color_solar, marker='o', label='Solar Irradiance')
+    
+    ax.legend(handles=[wind_p, solar_p], loc='lower center', 
+              bbox_to_anchor=(0.5, -0.25), ncol=2, frameon=False, fontsize=9)
+
+    plt.tight_layout()
+
+    if save_path:
+        os.makedirs(save_path, exist_ok=True)
+        filename = os.path.join(save_path, "annual_indexed_wind_solar_variability_SudAtlantique.png")
+        fig.savefig(filename, dpi=300, bbox_inches="tight")
+        print(f"Plot saved to: {filename}")
+
+    return fig, ax
+
+def plot_combined_annual_variability_final(
+    site_ids: Optional[Iterable[int]] = None,
+    wind_col: str = "WS_150",
+    solar_col: str = "ghi",
+    price_col: str = "price",
+    figsize: tuple = (12, 10),
+    save_path: Optional[str] = None,
+    manual_site_names: Optional[Iterable[str]] = None,
+) -> tuple:
+    """
+    Two-row subplot:
+    Top: Wind & Solar
+    Bottom: Wind, Solar & Price
+    Single legend at the very bottom.
+    """
+    examples_sites = load_examples_sites()
+    input_ts_by_site = load_input_timeseries()
+
+    if site_ids is None:
+        site_ids = [12]
+    selected_ids = list(site_ids)
+    
+    if manual_site_names is not None:
+        site_name = list(manual_site_names)[0]
+    else:
+        site_name = _format_site_name(str(examples_sites.loc[selected_ids[0], "name"]))
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=figsize, sharex=True)
+
+    color_wind = "#43D1D9"   # Teal
+    color_solar = "#4B86C2"  # Blue
+    color_price = "#9C7667"  # Copper/Brown
+
+    def format_year(x, pos):
+        return f"{int(x) % 100:02d}"
+
+    for site_id in selected_ids:
+        if site_id not in input_ts_by_site: continue
+            
+        site_df = input_ts_by_site[site_id].copy()
+        if not isinstance(site_df.index, pd.DatetimeIndex):
+            site_df.index = pd.to_datetime(site_df.index, errors="coerce", dayfirst=True)
+        
+        w_res = _resolve_column(site_df, wind_col)
+        s_res = _resolve_column(site_df, solar_col)
+        p_res = _resolve_column(site_df, price_col)
+
+        annual = site_df[[w_res, s_res, p_res]].apply(pd.to_numeric, errors='coerce').resample('YE').mean()
+        norm = annual / annual.mean()
+
+        # TOP PLOT (Resources Only) - Labels suppressed for internal legend
+        ax1.plot(norm.index.year, norm[w_res], color=color_wind, marker='o')
+        ax1.plot(norm.index.year, norm[s_res], color=color_solar, marker='o')
+        
+        # BOTTOM PLOT (Resources & Price)
+        ax2.plot(norm.index.year, norm[w_res], color=color_wind, marker='o')
+        ax2.plot(norm.index.year, norm[s_res], color=color_solar, marker='o')
+        ax2.plot(norm.index.year, norm[p_res], color=color_price, marker='o')
+
+    # Formatting
+    for ax in [ax1, ax2]:
+        ax.axhline(1.0, color='#333333', lw=1.0, alpha=0.5)
+        ax.set_ylabel("Normalized Index", fontweight="bold", fontsize=10)
+        ax.grid(True, which='both', linestyle=':', linewidth=0.5)
+        ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
+        ax.xaxis.set_major_formatter(ticker.FuncFormatter(format_year))
+        ax.set_xlim(1981.5, 2015.5)
+
+    ax1.tick_params(labelbottom=False) 
+    ax2.set_xlabel("Scenario Year", fontweight="bold", fontsize=10)
+    plt.setp(ax2.get_xticklabels(), rotation=45, fontsize=8.5)
+
+    # SINGLE MAIN TITLE - Adjusted 'y' to be closer to the plot
+    fig.suptitle(f"Annual Resource and Price Variability: {site_name}", 
+                 fontweight="bold", fontsize=14, y=0.97)
+
+    # SINGLE LEGEND AT THE VERY BOTTOM - Adjusted 'bbox_to_anchor'
+    w_p = mlines.Line2D([], [], color=color_wind, marker='o', label='Wind Speed')
+    s_p = mlines.Line2D([], [], color=color_solar, marker='o', label='Solar Irradiance')
+    p_p = mlines.Line2D([], [], color=color_price, marker='o', label='Electricity Price')
+    
+    fig.legend(handles=[w_p, s_p, p_p], loc='lower center', 
+               bbox_to_anchor=(0.5, 0.04), # Moved up slightly
+               ncol=3, frameon=False, fontsize=10)
+
+    # ADJUST LAYOUT - Reduced padding in 'rect' and reduced 'hspace'
+    # rect=[left, bottom, right, top]
+    plt.tight_layout(rect=[0, 0.07, 1, 0.98]) 
+    plt.subplots_adjust(hspace=0.1) 
+
+    if save_path:
+        os.makedirs(save_path, exist_ok=True)
+        filename = os.path.join(save_path, "annual_indexed_wind_solar_variability_stacked_SudAtlantique.png")
+        fig.savefig(filename, dpi=300, bbox_inches="tight")
+        print(f"Plot saved to: {filename}")
+
+    return fig, (ax1, ax2)
 
 if __name__ == "__main__":
     # Storage path for plots
     PLOT_STORAGE_PATH = r"C:\Users\malth\HPP\hydesign\HPP\DataStoreage"
 
     # Print summary table
-    summary_table = load_and_build_summary_table(
-        wind_col="WS_150",
-        solar_col="ghi",
-        price_col="price",
-    )
-    # print(summary_table.to_string())
-    # print("\n" + "="*80 + "\n")
+    #summary_table = load_and_build_summary_table(
+    #    wind_col="WS_150",
+    #    solar_col="ghi",
+    #    price_col="price",
+    #)
+    #print(summary_table.to_string())
+    #print("\n" + "="*80 + "\n")
 
     # Plot wind speed distribution for default sites (0, 5, 3) and save
     #fig, axes = plot_wind_speed_distribution(
-    #    site_ids=[0, 5, 3],
-    #    save_path=PLOT_STORAGE_PATH
+    #    manual_site_names=["Nordsøen Midt (DK)", "Sud Atlantique (FRw)", "Sicily South (IT)"],
+    #    site_ids=[7, 12, 10],
+    #    save_path=PLOT_STORAGE_PATH,
     #)
     #plt.close(fig)
 
     # Plot solar irradiance distribution for default sites and save
     #fig, axes = plot_solar_irradiance_distribution(
-    #    site_ids=[0, 5, 3],
+    #    manual_site_names=["Nordsøen Midt (DK)", "Sud Atlantique (FRw)", "Sicily South (IT)"],
+    #    site_ids=[7, 12, 10],
     #    save_path=PLOT_STORAGE_PATH,
     #)
     #plt.close(fig)
@@ -1300,7 +1758,8 @@ if __name__ == "__main__":
 
     # Plot daily mean wind speed and solar irradiance for default sites and save
     #fig, axes = plot_daily_mean_wind_and_solar(
-    #    site_ids=[0, 5, 3],
+    #    site_ids=[7, 12, 10],
+    #    manual_site_names=["Nordsøen Midt (DK)", "Sud Atlantique (FRw)", "Sicily South (IT)"],
     #    target_year=2012,
     #    save_path=PLOT_STORAGE_PATH,
     #)
@@ -1324,8 +1783,9 @@ if __name__ == "__main__":
 
     # Plot mean hourly wind-price and solar-price for default sites and save
     #fig, axes = plot_mean_hourly_resource_and_price(
-    #    site_ids=[0, 5, 3],
-    #    save_path=PLOT_STORAGE_PATH,
+    #    manual_site_names=["Nordsøen Midt (DK)", "Sud Atlantique (FRw)", "Sicily South (IT)"],
+    #    site_ids=[7, 12, 10],
+    #     save_path=PLOT_STORAGE_PATH,
     #)
     #plt.close(fig)
 
@@ -1337,43 +1797,66 @@ if __name__ == "__main__":
     #plt.close(fig)
 
     # Plot monthly mean resource and price for default sites and save
-    fig, axes = plot_mean_monthly_resource_and_price(
-        site_ids=[1, 4, 5],
-        save_path=PLOT_STORAGE_PATH,
-    )
+    #fig, axes = plot_mean_monthly_resource_and_price(
+    #    site_ids=[1, 4, 5],
+    #    save_path=PLOT_STORAGE_PATH,
+    #)
+    #plt.close(fig)
+
+    # Plot Monthly Variations in Long-Term Mean Day-Ahead Market Prices
+    #fig, axes = plot_monthly_market_prices(
+    #    site_ids=[7, 12, 10],
+    #    manual_site_names=["Nordsøen Midt (DK)", "Sud Atlantique (FRw)", "Sicily South (IT)"],
+    #    save_path=PLOT_STORAGE_PATH,
+    #)
+
+    # Plot Historical Day-Ahead Market Price Time-Series and Volatility
+    #fig, axes = plot_monthly_mean_price_timeseries(
+    #    site_ids=[7, 12, 10],
+    #    manual_site_names=["Nordsøen Midt (DK)", "Sud Atlantique (FRw)", "Sicily South (IT)"],
+    #    save_path=PLOT_STORAGE_PATH,
+    #)
+    #plt.close(fig)
+
+    # Plot indexed wind, solar and price. 
+    fig, axes = plot_combined_annual_variability_final(
+        site_ids=[14],
+        manual_site_names=["Sud Atlantique (FRw)"],
+        save_path=PLOT_STORAGE_PATH
+    )   
     plt.close(fig)
 
     # Plot 3x2 wind vs price for all sites
-    examples_sites = load_examples_sites()
-    input_ts_by_site = load_input_timeseries()
-    plot_all_sites_scatterhist_resource_vs_price(
-        input_ts_by_site=input_ts_by_site,
-        examples_sites=examples_sites,
-        resource_col="WS_150",
-        price_col="Price",
-        color="tab:blue",
-        alpha=0.5,
-        resource_label="Wind Speed (m/s)",
-        price_label="Price (EUR/MW)",
-        figsize=(14, 10),
-        plot_type="wind",
-        save_path=PLOT_STORAGE_PATH,
-    )
+    #examples_sites = load_examples_sites()
+    #input_ts_by_site = load_input_timeseries()
+    #plot_all_sites_scatterhist_resource_vs_price(
+    #    input_ts_by_site=input_ts_by_site,
+    #    examples_sites=examples_sites,
+    #    resource_col="WS_150",
+    #    price_col="Price",
+    #    color="tab:blue",
+    #    alpha=0.5,
+    #    resource_label="Wind Speed (m/s)",
+    #    price_label="Price (EUR/MW)",
+    #    figsize=(14, 10),
+    #    plot_type="wind",
+    #    save_path=PLOT_STORAGE_PATH,
+    #)
 
     # Plot 3x2 solar vs price for all sites
-    plot_all_sites_scatterhist_resource_vs_price(
-        input_ts_by_site=input_ts_by_site,
-        examples_sites=examples_sites,
-        resource_col="GHI",
-        price_col="Price",
-        color="darkorange",
-        alpha=0.5,
-        resource_label="Solar Irradiance (W/m^2)",
-        price_label="Price (EUR/MW)",
-        figsize=(14, 10),
-        plot_type="solar",
-        save_path=PLOT_STORAGE_PATH,
-    )
+    #plot_all_sites_scatterhist_resource_vs_price(
+    #    input_ts_by_site=input_ts_by_site,
+    #    examples_sites=examples_sites,
+    #    resource_col="GHI",
+    #    price_col="Price",
+    #    color="darkorange",
+    #    alpha=0.5,
+    #    resource_label="Solar Irradiance (W/m^2)",
+    #    price_label="Price (EUR/MW)",
+    #    figsize=(14, 10),
+    #    plot_type="solar",
+    #    save_path=PLOT_STORAGE_PATH,
+    #)
 
     # Uncomment to plot different site combinations:
     # fig, axes = plot_wind_speed_distribution(site_ids=[0, 1, 2], save_path=PLOT_STORAGE_PATH)  # First 3 sites

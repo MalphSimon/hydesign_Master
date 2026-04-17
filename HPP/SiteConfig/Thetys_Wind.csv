@@ -1,0 +1,55 @@
+,Thetys_Wind_HiFiEMS
+clearance [m],27.0
+sp [W/m2],343.0
+p_rated [MW],15.0
+Nwt,33.25234377730028
+wind_MW_per_km2 [MW/km2],5.0
+solar_MW [MW],0.0
+surface_tilt [deg],0.0
+surface_azimuth [deg],180.0
+DC_AC_ratio,1.0
+b_P [MW],0.0
+b_E_h [h],0.0
+cost_of_battery_P_fluct_in_peak_price_ratio,14.790843537968206
+name,Thetys_Wind_HiFiEMS
+longitude,4.193
+latitude,52.542
+altitude,100
+NPV_over_CAPEX,-0.7546414788671761
+NPV [MEuro],-898.8942203449918
+IRR,0.0
+LCOE [Euro/MWh],58.747098152233676
+Revenues [MEuro],54.79700416281537
+CAPEX [MEuro],1191.1540056005927
+OPEX [MEuro],31.22729853017818
+Wind CAPEX [MEuro],877.6540056005927
+Wind OPEX [MEuro],31.22729853017818
+PV CAPEX [MEuro],0.0
+PV OPEX [MEuro],0.0
+Batt CAPEX [MEuro],0.0
+Batt OPEX [MEuro],0.0
+Shared CAPEX [MEuro],313.5
+Shared OPEX [MEuro],0.0
+penalty lifetime [MEuro],0.0
+Mean Annual Electricity Sold [GWh],2104.4788292879807
+GUF,0.4804746185588997
+grid [MW],500.0
+wind [MW],498.78515665950425
+solar [MW],0.0
+Battery Energy [MWh],0.0
+Battery Power [MW],0.0
+Total curtailment [GWh],0.0
+Total curtailment with deg [GWh],0.0
+Awpp [km2],99.75703133190085
+Apvp [km2],0.0
+Plant area [km2],99.75703133190085
+Rotor diam [m],235.96828103188196
+Hub height [m],144.98414051594096
+Number of batteries used in lifetime,0.0
+Break-even PPA price [Euro/MWh],60.485096808232875
+Capacity factor wind [-],0.48164486467156
+AEP [GWh],2104.4788292879807
+AEP with degradation [GWh],2104.4788292879803
+design obj,NPV_over_CAPEX
+opt time [min],5.08
+n_model_evals,81
