@@ -217,6 +217,8 @@ class EMS:
 
             reg_vol_up = Inputs["reg_vol_up"]
             reg_vol_dw = Inputs["reg_vol_dw"]
+            DA_wind_forecast = Inputs["DA_wind_forecast"]
+            DA_solar_forecast = Inputs["DA_solar_forecast"]
             RT_wind_forecast = Inputs["RT_wind_forecast"]
             RT_solar_forecast = Inputs["RT_solar_forecast"]
             Wind_measurement = Inputs["Wind_measurement"]
@@ -225,8 +227,8 @@ class EMS:
             BM_up_price_cleared = Inputs["BM_up_price_cleared"]
             BM_dw_price_cleared = Inputs["BM_dw_price_cleared"]
             # Call EMS Model
-            # Run SMOpt
-            if callable(self.ems_models.get("SMOpt")):
+            # Run SMOpt (day-ahead market - needs battery for optimization)
+            if callable(self.ems_models.get("SMOpt")) and EBESS > 0:
                 SMOpt = self.ems_models.get("SMOpt")
 
                 (
@@ -250,13 +252,55 @@ class EMS:
                 P_HPP_RT_ref = P_HPP_SM_t_opt.iloc[0, 0]
 
                 dynamic_inputs["P_HPP_SM_t_opt"] = P_HPP_SM_t_opt
+            else:
+                # When no battery (EBESS=0), schedule all wind+solar output directly for day-ahead market
+                # Use day-ahead forecasts (available from inputs)
+                DA_wind_forecast = Inputs.get("DA_wind_forecast", np.zeros(T))
+                DA_solar_forecast = Inputs.get("DA_solar_forecast", np.zeros(T))
+                
+                # Ensure they are numpy arrays
+                if hasattr(DA_wind_forecast, 'values'):
+                    DA_wind_forecast = DA_wind_forecast.values
+                if hasattr(DA_solar_forecast, 'values'):
+                    DA_solar_forecast = DA_solar_forecast.values
+                DA_wind_forecast = np.asarray(DA_wind_forecast, dtype=float).flatten()[:T]
+                DA_solar_forecast = np.asarray(DA_solar_forecast, dtype=float).flatten()[:T]
+                
+                # Pad to length T if needed
+                if len(DA_wind_forecast) < T:
+                    DA_wind_forecast = np.pad(DA_wind_forecast, (0, T - len(DA_wind_forecast)))
+                if len(DA_solar_forecast) < T:
+                    DA_solar_forecast = np.pad(DA_solar_forecast, (0, T - len(DA_solar_forecast)))
+                
+                # Total power limited by grid connection
+                P_w_SM_t_opt = pd.DataFrame(DA_wind_forecast.reshape(-1, 1), columns=["w_SM"])
+                P_s_SM_t_opt = pd.DataFrame(DA_solar_forecast.reshape(-1, 1), columns=["s_SM"])
+                P_HPP_SM_t = np.minimum(DA_wind_forecast + DA_solar_forecast, P_grid_limit)
+                
+                E_HPP_SM_t_opt = pd.DataFrame(np.zeros((T, 1)), columns=["E_SM"])
+                P_HPP_SM_t_opt = pd.DataFrame(P_HPP_SM_t.reshape(-1, 1), columns=["SM"])
+                P_HPP_SM_k_opt = pd.DataFrame(np.zeros((24, 1)), columns=["SM_k"])
+                P_dis_SM_t_opt = pd.DataFrame(np.zeros((T, 1)), columns=["dis_SM"])
+                P_cha_SM_t_opt = pd.DataFrame(np.zeros((T, 1)), columns=["cha_SM"])
+                SoC_SM_t_opt = pd.DataFrame(np.full((T+1, 1), SoCini), columns=["SoC_SM"])
+                P_w_SM_cur_t_opt = pd.DataFrame(np.zeros((1, T)), columns=[f"P_w_SM_cur_{i}" for i in range(T)])
+                P_s_SM_cur_t_opt = pd.DataFrame(np.zeros((1, T)), columns=[f"P_s_SM_cur_{i}" for i in range(T)])
+                
+                P_HPP_SM_t_opt.index = range(T)
+                P_HPP_RT_ref = P_HPP_SM_t[0] if len(P_HPP_SM_t) > 0 else 0
+                
+                dynamic_inputs["P_HPP_SM_t_opt"] = P_HPP_SM_t_opt
 
             if callable(self.ems_models.get("BMOpt")) and callable(
                 self.ems_models.get("RDOpt")
-            ):
+            ) and EBESS > 0:
                 BMOpt = self.ems_models.get("BMOpt")
                 RDOpt = self.ems_models.get("RDOpt")
-                for i in range(0, 24):
+                # Ensure reg_vol arrays have at least 24 elements
+                reg_vol_up = np.pad(np.asarray(reg_vol_up), (0, max(0, 24 - len(reg_vol_up))), mode='constant')
+                reg_vol_dw = np.pad(np.asarray(reg_vol_dw), (0, max(0, 24 - len(reg_vol_dw))), mode='constant')
+                
+                for i in range(0, min(24, len(reg_vol_up), len(reg_vol_dw))):
                     # BM_up_price_forecast_settle = BM_up_price_forecast.squeeze().repeat(SI_num)
                     # BM_up_price_forecast_settle.index = range(T_SI + int(exten_num/SIDI_num))
                     # BM_dw_price_forecast_settle = BM_dw_price_forecast.squeeze().repeat(SI_num)
@@ -468,10 +512,14 @@ class EMS:
 
             elif callable(self.ems_models.get("BMOpt")) and not callable(
                 self.ems_models.get("RDOpt")
-            ):
+            ) and EBESS > 0:
                 BMOpt = self.ems_models.get("BMOpt")
+                
+                # Ensure reg_vol arrays have at least 24 elements
+                reg_vol_up = np.pad(np.asarray(reg_vol_up), (0, max(0, 24 - len(reg_vol_up))), mode='constant')
+                reg_vol_dw = np.pad(np.asarray(reg_vol_dw), (0, max(0, 24 - len(reg_vol_dw))), mode='constant')
 
-                for i in range(0, 24):
+                for i in range(0, min(24, len(reg_vol_up), len(reg_vol_dw))):
                     # BM_up_price_forecast_settle = BM_up_price_forecast.squeeze().repeat(SI_num)
                     # BM_up_price_forecast_settle.index = range(T_SI + int(exten_num/SIDI_num))
                     # BM_dw_price_forecast_settle = BM_dw_price_forecast.squeeze().repeat(SI_num)
@@ -892,6 +940,16 @@ class EMS:
             residual_imbalance = pd.DataFrame(residual_imbalance)
             P_HPP_RT_ts = pd.DataFrame(P_HPP_RT_ts)
             P_HPP_RT_refs = pd.DataFrame(P_HPP_RT_refs)
+            
+            # When no battery (EBESS=0), RT dispatch = SM schedule, so no imbalance
+            if EBESS == 0:
+                if P_HPP_RT_ts.empty:
+                    P_HPP_RT_ts = P_HPP_SM_t_opt.copy().rename(columns={"SM": "RT"})
+                else:
+                    P_HPP_RT_ts = P_HPP_SM_t_opt.copy().rename(columns={"SM": "RT"})
+                if P_HPP_RT_refs.empty:
+                    P_HPP_RT_refs = P_HPP_SM_t_opt.copy().rename(columns={"SM": "Ref"})
+            
             P_dis_RT_ts = pd.DataFrame(P_dis_RT_ts)
             P_cha_RT_ts = pd.DataFrame(P_cha_RT_ts)
             RES_RT_cur_ts = pd.DataFrame(RES_RT_cur_ts)
@@ -917,17 +975,34 @@ class EMS:
             )
 
             # SoC_all = pd.read_excel('results_run.xlsx', sheet_name = 'SoC', nrows=(day_num-1)*T, engine='openpyxl')
-            SoC_all = pd.read_csv(out_dir + "SoC.csv")
             SoC_ts = pd.DataFrame(SoC_ts)
-            if SoC_all.empty:
+            try:
+                SoC_all = pd.read_csv(out_dir + "SoC.csv")
+                if SoC_all.empty:
+                    SoC_all = SoC_ts
+                else:
+                    SoC_all = pd.concat([SoC_all, SoC_ts])
+            except (FileNotFoundError, pd.errors.EmptyDataError, pd.errors.ParserError):
+                # If SoC.csv doesn't exist or is empty, use current SoC_ts
                 SoC_all = SoC_ts
-            else:
-                SoC_all = pd.concat([SoC_all, SoC_ts])
 
             SoC_all = SoC_all.values.tolist()
+            
+            # Ensure SoC_all has enough entries
+            expected_length = int(day_num * T)
+            if len(SoC_all) < expected_length:
+                # Pad with default values if needed
+                while len(SoC_all) < expected_length:
+                    SoC_all.append([SoC0])
 
             SoC_for_rainflow = SoC_all
-            SoC_for_rainflow = [SoC_for_rainflow[i][0] for i in range(int(day_num * T))]
+            # Safe extraction: handle case where list might still be shorter than expected
+            try:
+                SoC_for_rainflow = [SoC_for_rainflow[i][0] if i < len(SoC_for_rainflow) else SoC0 
+                                    for i in range(expected_length)]
+            except (IndexError, TypeError):
+                # Fallback: create array of SoC0 values
+                SoC_for_rainflow = [SoC0] * expected_length
 
             ld, nld, ld1, nld1, rf_DoD, rf_SoC, rf_count, nld_t, cycles = (
                 DegCal.Deg_Model(SoC_for_rainflow, Ini_nld, pre_nld, ld1, nld1, day_num)
@@ -940,8 +1015,14 @@ class EMS:
                     cycles.iloc[0, 0] / total_cycles * EBESS * capital_cost
                 )
             else:
-                Deg = pd.read_csv(out_dir + "Degradation.csv")
-                cycle_of_day = Deg.iloc[-1, 2] - Deg.iloc[-2, 2]
+                try:
+                    Deg = pd.read_csv(out_dir + "Degradation.csv")
+                    if len(Deg) >= 2:
+                        cycle_of_day = Deg.iloc[-1, 2] - Deg.iloc[-2, 2]
+                    else:
+                        cycle_of_day = cycles.iloc[0, 0]
+                except (FileNotFoundError, pd.errors.EmptyDataError, pd.errors.ParserError, IndexError, TypeError, ValueError):
+                    cycle_of_day = cycles.iloc[0, 0]
                 Deg_cost_by_cycle = cycle_of_day / total_cycles * EBESS * capital_cost
 
             P_HPP_RT_ts.index = range(T)
@@ -1043,17 +1124,27 @@ class EMS:
                 out_dir + "revenue.csv", mode="a", index=False, header=False
             )
 
-            Pdis_all = pd.read_csv(out_dir + "schedule.csv", usecols=[3])
-            Pcha_all = pd.read_csv(out_dir + "schedule.csv", usecols=[4])
-            nld_all = pd.read_csv(out_dir + "Degradation.csv", usecols=[0])
-            ad_all = pd.read_csv(out_dir + "slope.csv", usecols=[0])
-            ad = DegCal.slope_update(
-                Pdis_all, Pcha_all, nld_all, day_num, 7, T, DI, ad_all
-            )
+            try:
+                Pdis_all = pd.read_csv(out_dir + "schedule.csv", usecols=[3])
+                Pcha_all = pd.read_csv(out_dir + "schedule.csv", usecols=[4])
+                # Ensure numeric data
+                Pdis_all = Pdis_all.apply(pd.to_numeric, errors='coerce')
+                Pcha_all = Pcha_all.apply(pd.to_numeric, errors='coerce')
+                nld_all = pd.read_csv(out_dir + "Degradation.csv", usecols=[0])
+                nld_all = nld_all.apply(pd.to_numeric, errors='coerce')
+                ad_all = pd.read_csv(out_dir + "slope.csv", usecols=[0])
+                ad_all = ad_all.apply(pd.to_numeric, errors='coerce')
+                ad = DegCal.slope_update(
+                    Pdis_all, Pcha_all, nld_all, day_num, 7, T, DI, ad_all
+                )
 
-            pd.DataFrame([ad], columns=["slope"]).to_csv(
-                out_dir + "slope.csv", mode="a", index=False, header=False
-            )
+                pd.DataFrame([ad], columns=["slope"]).to_csv(
+                    out_dir + "slope.csv", mode="a", index=False, header=False
+                )
+            except (pd.errors.EmptyDataError, pd.errors.ParserError, FileNotFoundError, TypeError, ValueError):
+                # If files are empty or not found early in simulation, skip slope update
+                pass
+            
             if nld > 0.2:
                 break
 

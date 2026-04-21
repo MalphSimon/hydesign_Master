@@ -1714,7 +1714,7 @@ def plot_combined_annual_variability_final(
 
     if save_path:
         os.makedirs(save_path, exist_ok=True)
-        filename = os.path.join(save_path, "annual_indexed_wind_solar_variability_stacked_SudAtlantique.png")
+        filename = os.path.join(save_path, "annual_indexed_wind_solar_variability_stacked_Thetys.png")
         fig.savefig(filename, dpi=300, bbox_inches="tight")
         print(f"Plot saved to: {filename}")
 
@@ -1820,8 +1820,8 @@ if __name__ == "__main__":
 
     # Plot indexed wind, solar and price. 
     fig, axes = plot_combined_annual_variability_final(
-        site_ids=[14],
-        manual_site_names=["Sud Atlantique (FRw)"],
+        site_ids=[8],
+        manual_site_names=["Thetys (NL)"],
         save_path=PLOT_STORAGE_PATH
     )   
     plt.close(fig)

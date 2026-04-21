@@ -59,6 +59,17 @@ class hpp_model(hpp_base):
             if sim_pars["data_dir"] is not None:
                 data_dir = sim_pars["data_dir"]
 
+        out_dir_for_marker = sim_pars.get("out_dir", "NOT SET")
+        out_dir_abs = os.path.abspath(out_dir_for_marker)
+        
+        try:
+            test_marker = os.path.join(out_dir_abs, "___SETUP_CALLED___.txt")
+            os.makedirs(out_dir_abs, exist_ok=True)
+            with open(test_marker, 'w') as f:
+                f.write(f"HPP setup() called. out_dir={out_dir_for_marker}, absolute={out_dir_abs}\n")
+        except Exception as e:
+            pass
+
         Wind_data = pd.read_csv(os.path.join(data_dir, sim_pars["wind_fn"]))
         Solar_data = pd.read_csv(os.path.join(data_dir, sim_pars["solar_fn"]))
         Market_data = pd.read_csv(os.path.join(data_dir, sim_pars["market_fn"]))
@@ -154,6 +165,10 @@ class hpp_model(hpp_base):
             }
         )
 
+        # Compute intervals_per_hour from dispatch_interval for consistency across components
+        dispatch_interval = parameter_dict.get("dispatch_interval", 1 / 4)
+        intervals_per_hour = int(1 / dispatch_interval)
+
         comps = [
             (
                 "ems",
@@ -177,7 +192,7 @@ class hpp_model(hpp_base):
                     hh_ref=sim_pars["hh_ref"],
                     p_rated_ref=sim_pars["p_rated_ref"],
                     N_time=N_time,
-                    intervals_per_hour=4,
+                    intervals_per_hour=intervals_per_hour,
                 ),
                 {"wind_t": "wind_t_rt"},
             ),
@@ -202,7 +217,7 @@ class hpp_model(hpp_base):
                     ],
                     battery_control_system_cost=sim_pars["battery_control_system_cost"],
                     battery_energy_onm_cost=sim_pars["battery_energy_onm_cost"],
-                    intervals_per_hour=4,
+                    intervals_per_hour=intervals_per_hour,
                     battery_price_reduction_per_year=battery_price_reduction_per_year,
                 ),
             ),
@@ -228,6 +243,7 @@ class hpp_model(hpp_base):
                     ref_yr_inflation=sim_pars["ref_yr_inflation"],
                     phasing_yr=sim_pars["phasing_yr"],
                     phasing_CAPEX=sim_pars["phasing_CAPEX"],
+                    intervals_per_hour=intervals_per_hour,
                 ),
                 {
                     "CAPEX_el": "CAPEX_sh",
@@ -299,6 +315,7 @@ class hpp_model(hpp_base):
         solar_MW,
         b_P,
         b_E_h,
+        wind_MW_per_km2=6,
         **kwargs,
     ):
         """Calculating the financial metrics of the hybrid power plant project.
@@ -339,11 +356,11 @@ class hpp_model(hpp_base):
         self.num_batteries : Number of allowed replacements of the battery
         """
 
+        out_dir_eval = self.sim_pars.get("out_dir", "NOT SET IN EVALUATE")
+        
         prob = self.prob
 
         # assumed values:
-        wind_MW_per_km2 = 6  # [MW/km2]
-
         Awpp = wind_MW / wind_MW_per_km2
         b_E = b_E_h * b_P
 
@@ -383,6 +400,19 @@ class hpp_model(hpp_base):
         prob.run_model()
 
         self.prob = prob
+        
+        # Debug: Check if key outputs are valid
+        try:
+            npv_val = prob["NPV"]
+            irr_val = prob["IRR"]
+            rev_val = prob["revenues"]
+            lcoe_val = prob["LCOE"]
+            if np.isnan(npv_val) or np.isnan(irr_val) or np.isnan(rev_val):
+                import sys
+                print(f"WARNING: NaN detected in outputs - NPV={npv_val}, IRR={irr_val}, revenues={rev_val}, LCOE={lcoe_val}", file=sys.stderr)
+        except Exception as e:
+            import sys
+            print(f"ERROR checking outputs: {e}", file=sys.stderr)
 
         outputs = np.hstack(
             [

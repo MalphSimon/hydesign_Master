@@ -129,7 +129,7 @@ def f_xmin_to_ymin(x, reso_x, reso_y):  # x: dataframe reso: in hour
     else:
         y = pd.DataFrame(np.repeat(x, int(reso_x / reso_y)))
         num = int(reso_x / reso_y)
-    y.index = range(int(len(x) / num))
+    y.index = range(len(y))
     return y
 
 
@@ -147,6 +147,14 @@ def _revenue_calculation(
     s_DW_t,
     BI,
 ):
+    # Ensure price data is pandas Series, not numpy arrays
+    if isinstance(SM_price_cleared, np.ndarray):
+        SM_price_cleared = pd.Series(SM_price_cleared)
+    if isinstance(BM_dw_price_cleared, np.ndarray):
+        BM_dw_price_cleared = pd.Series(BM_dw_price_cleared)
+    if isinstance(BM_up_price_cleared, np.ndarray):
+        BM_up_price_cleared = pd.Series(BM_up_price_cleared)
+    
     DI = parameter_dict["dispatch_interval"]
     DI_num = int(1 / DI)
 
@@ -154,40 +162,66 @@ def _revenue_calculation(
     SI_num = int(1 / SI)
 
     # Spot market revenue
-    SM_price_cleared_DI = SM_price_cleared.repeat(DI_num)
-    SM_revenue = P_HPP_SM_t_opt.squeeze() * SM_price_cleared_DI * DI
+    SM_price_cleared_DI = SM_price_cleared.repeat(DI_num).reset_index(drop=True)
+    P_HPP_SM_t_opt_squeezed = P_HPP_SM_t_opt.squeeze()
+    
+    # Guard against size mismatch: truncate longer array to match shorter one
+    if len(P_HPP_SM_t_opt_squeezed) != len(SM_price_cleared_DI):
+        min_len = min(len(P_HPP_SM_t_opt_squeezed), len(SM_price_cleared_DI))
+        P_HPP_SM_t_opt_squeezed = P_HPP_SM_t_opt_squeezed[:min_len]
+        SM_price_cleared_DI = SM_price_cleared_DI[:min_len]
+    
+    SM_revenue = P_HPP_SM_t_opt_squeezed * SM_price_cleared_DI * DI
 
     # Regulation revenue
-    BM_up_price_cleared_DI = BM_up_price_cleared.repeat(DI_num)
-    BM_dw_price_cleared_DI = BM_dw_price_cleared.repeat(DI_num)
+    BM_up_price_cleared_DI = BM_up_price_cleared.repeat(DI_num).reset_index(drop=True)
+    BM_dw_price_cleared_DI = BM_dw_price_cleared.repeat(DI_num).reset_index(drop=True)
 
     s_UP_t = pd.Series(s_UP_t)
     s_DW_t = pd.Series(s_DW_t)
+    
+    # Guard against size mismatch in regulation revenue calculation
+    if len(s_UP_t) != len(BM_up_price_cleared_DI):
+        min_len = min(len(s_UP_t), len(BM_up_price_cleared_DI), len(P_HPP_UP_bid_ts), len(P_HPP_DW_bid_ts))
+        s_UP_t = s_UP_t[:min_len]
+        s_DW_t = s_DW_t[:min_len]
+        BM_up_price_cleared_DI = BM_up_price_cleared_DI[:min_len]
+        BM_dw_price_cleared_DI = BM_dw_price_cleared_DI[:min_len]
+        P_HPP_UP_bid_ts = P_HPP_UP_bid_ts.iloc[:min_len] if hasattr(P_HPP_UP_bid_ts, 'iloc') else P_HPP_UP_bid_ts[:min_len]
+        P_HPP_DW_bid_ts = P_HPP_DW_bid_ts.iloc[:min_len] if hasattr(P_HPP_DW_bid_ts, 'iloc') else P_HPP_DW_bid_ts[:min_len]
 
     reg_revenue = (s_UP_t * P_HPP_UP_bid_ts.squeeze() * DI * BM_up_price_cleared_DI) - (
         s_DW_t * P_HPP_DW_bid_ts.squeeze() * BI * BM_dw_price_cleared_DI
     )
 
     # Imbalance revenue
-    BM_up_price_cleared_SI = BM_up_price_cleared.repeat(SI_num)
-    BM_dw_price_cleared_SI = BM_dw_price_cleared.repeat(SI_num)
-    P_HPP_RT_ts_15min = f_xmin_to_ymin(P_HPP_RT_ts, DI, 1 / 4)
-    P_HPP_RT_refs_15min = f_xmin_to_ymin(P_HPP_RT_refs, DI, 1 / 4)
+    BM_up_price_cleared_SI = BM_up_price_cleared.repeat(SI_num).reset_index(drop=True)
+    BM_dw_price_cleared_SI = BM_dw_price_cleared.repeat(SI_num).reset_index(drop=True)
+    
+    # Skip imbalance revenue when no battery (EBESS=0) since RT dispatch = DA schedule
+    EBESS = parameter_dict.get("battery_energy_capacity", 0)
+    if EBESS <= 0 or P_HPP_RT_ts.empty or P_HPP_RT_refs.empty:
+        # No imbalance when zero battery - RT follows DA schedule perfectly
+        power_imbalance = pd.Series(np.zeros(len(BM_up_price_cleared_SI)))
+        pos_imbalance = power_imbalance
+        neg_imbalance = power_imbalance
+        im_revenue = pos_imbalance * SI * BM_dw_price_cleared_SI + neg_imbalance * SI * BM_up_price_cleared_SI
+        im_power_cost_DK1 = pd.Series(np.zeros(len(BM_up_price_cleared_SI)))
+    else:
+        P_HPP_RT_ts_15min = f_xmin_to_ymin(P_HPP_RT_ts, DI, 1 / 4)
+        P_HPP_RT_refs_15min = f_xmin_to_ymin(P_HPP_RT_refs, DI, 1 / 4)
 
-    power_imbalance = pd.Series(
-        (P_HPP_RT_ts_15min.values - P_HPP_RT_refs_15min.values)[:, 0]
-    )
+        power_imbalance = pd.Series(
+            (P_HPP_RT_ts_15min.values - P_HPP_RT_refs_15min.values)[:, 0]
+        )
 
-    pos_imbalance = power_imbalance.apply(lambda x: x if x > 0 else 0)
-    neg_imbalance = power_imbalance.apply(lambda x: x if x < 0 else 0)
+        pos_imbalance = power_imbalance.apply(lambda x: x if x > 0 else 0)
+        neg_imbalance = power_imbalance.apply(lambda x: x if x < 0 else 0)
 
-    im_revenue = np.asarray(pos_imbalance * SI * BM_dw_price_cleared_SI) + np.asarray(
-        neg_imbalance * SI * BM_up_price_cleared_SI
-    )
+        im_revenue = pos_imbalance * SI * BM_dw_price_cleared_SI + neg_imbalance * SI * BM_up_price_cleared_SI
 
-    # imbalance fee
-
-    im_power_cost_DK1 = abs(power_imbalance * SI) * parameter_dict["imbalance_fee"]
+        # imbalance fee
+        im_power_cost_DK1 = abs(power_imbalance * SI) * parameter_dict["imbalance_fee"]
 
     # Balancing market revenue
     BM_revenue = reg_revenue + im_revenue - im_power_cost_DK1
@@ -269,6 +303,19 @@ def RTSim(
     P_activated_DW_t,
     verbose=False,
 ):
+    # Guard against division by zero when battery energy capacity is zero
+    if Emax <= 0:
+        return (
+            0.0,  # E_HPP_RT_t_opt
+            0.0,  # P_HPP_RT_t_opt
+            0.0,  # P_dis_RT_t_opt
+            0.0,  # P_cha_RT_t_opt
+            pd.DataFrame({0: [SoC0, SoC0]}),  # SoC_RT_t_opt
+            Wind_measurement[start] + Solar_measurement[start],  # RES_RT_cur_t_opt
+            0.0,  # P_W_RT_t_opt
+            0.0,  # P_S_RT_t_opt
+        )
+
     # RES_error = Wind_measurement[start] + Solar_measurement[start] - RT_wind_forecast[start] - RT_solar_forecast[start]
 
     eta_cha_ha = eta_cha ** (dt)

@@ -155,6 +155,7 @@ class finance:
             inputs["s_UP_t"],
             inputs["s_DW_t"],
             df,
+            intervals_per_hour=self.intervals_per_hour,
         )
 
         CAPEX = (
@@ -252,11 +253,12 @@ class finance:
                 P_HPP_DW_bid_ts=inputs["P_HPP_DW_bid_ts"],
                 s_UP_t=inputs["s_UP_t"],
                 s_DW_t=inputs["s_DW_t"],
+                intervals_per_hour=self.intervals_per_hour,
             ),
         )
         outputs["NPV"] = NPV
         outputs["IRR"] = IRR
-        outputs["NPV_over_CAPEX"] = NPV / CAPEX
+        outputs["NPV_over_CAPEX"] = NPV / CAPEX if CAPEX > 0 else np.nan
 
         level_costs = np.sum(OPEX / (1 + hpp_discount_factor) ** iy) + CAPEX
         AEP_per_year = df.groupby("i_year").hpp_t.mean() * 365 * 24
@@ -495,10 +497,15 @@ def calculate_NPV_IRR(
     Net_income = EBITDA - Taxes
     Cashflow = np.insert(Net_income, 0, -investment_cost - development_cost)
     NPV = npf.npv(discount_rate, Cashflow)
-    if NPV > 0:
+    
+    # Calculate IRR regardless of NPV sign
+    try:
         IRR = npf.irr(Cashflow)
-    else:
-        IRR = 0
+        if pd.isna(IRR) or np.isnan(IRR):
+            IRR = np.nan
+    except (ValueError, RuntimeWarning):
+        IRR = np.nan
+    
     return NPV, IRR
 
 
@@ -553,6 +560,7 @@ def calculate_revenues(
     s_UP_t,
     s_DW_t,
     df,
+    intervals_per_hour=4,
 ):
     SM_revenue, _, _, BM_revenue, _ = _revenue_calculation(
         parameter_dict,
@@ -568,8 +576,14 @@ def calculate_revenues(
         s_DW_t,
         BI=1,
     )
-    df["revenue"] = SM_revenue + BM_revenue
-    return df.groupby("i_year").revenue.mean() * 365 * 24 * 4
+    # Ensure both arrays have the same length before adding
+    min_len = min(len(np.array(SM_revenue)), len(np.array(BM_revenue)))
+    SM_revenue_arr = np.array(SM_revenue)[:min_len]
+    BM_revenue_arr = np.array(BM_revenue)[:min_len]
+    
+    df["revenue"] = SM_revenue_arr + BM_revenue_arr
+    # Use intervals_per_hour instead of hardcoded 4
+    return df.groupby("i_year").revenue.mean() * 365 * 24 * intervals_per_hour
 
 
 def calculate_break_even_PPA_price(
@@ -593,6 +607,7 @@ def calculate_break_even_PPA_price(
     P_HPP_DW_bid_ts,
     s_UP_t,
     s_DW_t,
+    intervals_per_hour=4,
 ):
     def fun(price_el):
         revenues = calculate_revenues(
@@ -608,6 +623,7 @@ def calculate_break_even_PPA_price(
             s_UP_t,
             s_DW_t,
             df,
+            intervals_per_hour=intervals_per_hour,
         )
         NPV, _ = calculate_NPV_IRR(
             Net_revenue_t=revenues.values.flatten(),

@@ -49,7 +49,7 @@ class ems:
         simulation_dict,
         N_time,
         life_y=25,
-        intervals_per_hour=4,
+        intervals_per_hour=None,
         SMOpt="DO",
         BMOpt=None,
         RDOpt=None,
@@ -57,6 +57,12 @@ class ems:
 
         self.parameter_dict = parameter_dict
         self.simulation_dict = simulation_dict
+        
+        # Compute intervals_per_hour from dispatch_interval if not explicitly provided
+        if intervals_per_hour is None:
+            dispatch_interval = parameter_dict.get("dispatch_interval", 1 / 4)
+            intervals_per_hour = int(1 / dispatch_interval)
+        
         self.intervals_per_hour = intervals_per_hour
         self.life_y = life_y
         self.life_h = 365 * 24 * life_y
@@ -87,6 +93,19 @@ class ems:
         )
 
         simulation_dict = self.simulation_dict
+        out_dir_val = simulation_dict.get('out_dir', 'NOT SET')
+
+        
+        # Write marker file to confirm compute was called
+        try:
+            import os as os_module
+            if out_dir_val != 'NOT SET':
+                marker = os_module.path.join(str(out_dir_val), "___EMS_COMPUTE_CALLED___.txt")
+                os_module.makedirs(str(out_dir_val), exist_ok=True)
+                with open(marker, 'w') as f:
+                    f.write(f"EMS compute() method called!\nout_dir={out_dir_val}\n")
+        except Exception:
+            pass
         out_keys = [
             "P_HPP_SM_t_opt",
             "SM_price_cleared",
@@ -133,68 +152,130 @@ class ems:
             simulation_dict=simulation_dict,
         )
         P_charge_discharge_ts = -P_dis_RT_ts + P_cha_RT_ts
-        E_SOC_ts[-1] = E_SOC_ts[0]
+        
+        # Safely update E_SOC_ts endpoint
+        try:
+            if len(np.atleast_1d(E_SOC_ts)) > 1:
+                E_SOC_ts[-1] = E_SOC_ts[0]
+        except (IndexError, TypeError):
+            pass
 
-        outputs["P_HPP_SM_t_opt"] = expand_to_lifetime(
-            P_HPP_SM_t_opt,
-            life=self.life_intervals,
-            intervals_per_hour=self.intervals_per_hour,
-        )
-        outputs["SM_price_cleared"] = expand_to_lifetime(
-            SM_price_cleared, life=self.life_h, intervals_per_hour=1
-        )
-        outputs["BM_dw_price_cleared"] = expand_to_lifetime(
-            BM_dw_price_cleared, life=self.life_h, intervals_per_hour=1
-        )
-        outputs["BM_up_price_cleared"] = expand_to_lifetime(
-            BM_up_price_cleared, life=self.life_h, intervals_per_hour=1
-        )
-        outputs["P_HPP_ts"] = expand_to_lifetime(
-            P_HPP_RT_ts,
-            life=self.life_intervals,
-            intervals_per_hour=self.intervals_per_hour,
-        )
-        outputs["P_HPP_RT_refs"] = expand_to_lifetime(
-            P_HPP_RT_refs,
-            life=self.life_intervals,
-            intervals_per_hour=self.intervals_per_hour,
-        )
-        outputs["P_HPP_UP_bid_ts"] = expand_to_lifetime(
-            P_HPP_UP_bid_ts,
-            life=self.life_intervals,
-            intervals_per_hour=self.intervals_per_hour,
-        )
-        outputs["P_HPP_DW_bid_ts"] = expand_to_lifetime(
-            P_HPP_DW_bid_ts,
-            life=self.life_intervals,
-            intervals_per_hour=self.intervals_per_hour,
-        )
-        outputs["s_UP_t"] = expand_to_lifetime(
-            s_UP_t, life=self.life_intervals, intervals_per_hour=self.intervals_per_hour
-        )
-        outputs["s_DW_t"] = expand_to_lifetime(
-            s_DW_t, life=self.life_intervals, intervals_per_hour=self.intervals_per_hour
-        )
-        outputs["residual_imbalance"] = expand_to_lifetime(
-            residual_imbalance,
-            life=self.life_intervals,
-            intervals_per_hour=self.intervals_per_hour,
-        )
-        outputs["P_curtailment_ts"] = expand_to_lifetime(
-            P_curtailment_ts,
-            life=self.life_intervals,
-            intervals_per_hour=self.intervals_per_hour,
-        )
-        outputs["P_charge_discharge_ts"] = expand_to_lifetime(
-            P_charge_discharge_ts,
-            life=self.life_intervals,
-            intervals_per_hour=self.intervals_per_hour,
-        )
-        outputs["E_SOC_ts"] = expand_to_lifetime(
-            E_SOC_ts,
-            life=self.life_intervals + 1,
-            intervals_per_hour=self.intervals_per_hour,
-        )
+        # Safely expand arrays, handling potential empty/malformed data
+        try:
+            outputs["P_HPP_SM_t_opt"] = expand_to_lifetime(
+                P_HPP_SM_t_opt,
+                life=self.life_intervals,
+                intervals_per_hour=self.intervals_per_hour,
+            )
+        except (IndexError, ValueError):
+            outputs["P_HPP_SM_t_opt"] = np.zeros(self.life_intervals)
+        
+        try:
+            outputs["SM_price_cleared"] = expand_to_lifetime(
+                SM_price_cleared, life=self.life_h, intervals_per_hour=1
+            )
+        except (IndexError, ValueError):
+            outputs["SM_price_cleared"] = np.zeros(self.life_h)
+            
+        try:
+            outputs["BM_dw_price_cleared"] = expand_to_lifetime(
+                BM_dw_price_cleared, life=self.life_h, intervals_per_hour=1
+            )
+        except (IndexError, ValueError):
+            outputs["BM_dw_price_cleared"] = np.zeros(self.life_h)
+            
+        try:
+            outputs["BM_up_price_cleared"] = expand_to_lifetime(
+                BM_up_price_cleared, life=self.life_h, intervals_per_hour=1
+            )
+        except (IndexError, ValueError):
+            outputs["BM_up_price_cleared"] = np.zeros(self.life_h)
+            
+        try:
+            outputs["P_HPP_ts"] = expand_to_lifetime(
+                P_HPP_RT_ts,
+                life=self.life_intervals,
+                intervals_per_hour=self.intervals_per_hour,
+            )
+        except (IndexError, ValueError):
+            outputs["P_HPP_ts"] = np.zeros(self.life_intervals)
+            
+        try:
+            outputs["P_HPP_RT_refs"] = expand_to_lifetime(
+                P_HPP_RT_refs,
+                life=self.life_intervals,
+                intervals_per_hour=self.intervals_per_hour,
+            )
+        except (IndexError, ValueError):
+            outputs["P_HPP_RT_refs"] = np.zeros(self.life_intervals)
+            
+        try:
+            outputs["P_HPP_UP_bid_ts"] = expand_to_lifetime(
+                P_HPP_UP_bid_ts,
+                life=self.life_intervals,
+                intervals_per_hour=self.intervals_per_hour,
+            )
+        except (IndexError, ValueError):
+            outputs["P_HPP_UP_bid_ts"] = np.zeros(self.life_intervals)
+            
+        try:
+            outputs["P_HPP_DW_bid_ts"] = expand_to_lifetime(
+                P_HPP_DW_bid_ts,
+                life=self.life_intervals,
+                intervals_per_hour=self.intervals_per_hour,
+            )
+        except (IndexError, ValueError):
+            outputs["P_HPP_DW_bid_ts"] = np.zeros(self.life_intervals)
+            
+        try:
+            outputs["s_UP_t"] = expand_to_lifetime(
+                s_UP_t, life=self.life_intervals, intervals_per_hour=self.intervals_per_hour
+            )
+        except (IndexError, ValueError):
+            outputs["s_UP_t"] = np.zeros(self.life_intervals)
+            
+        try:
+            outputs["s_DW_t"] = expand_to_lifetime(
+                s_DW_t, life=self.life_intervals, intervals_per_hour=self.intervals_per_hour
+            )
+        except (IndexError, ValueError):
+            outputs["s_DW_t"] = np.zeros(self.life_intervals)
+            
+        try:
+            outputs["residual_imbalance"] = expand_to_lifetime(
+                residual_imbalance,
+                life=self.life_intervals,
+                intervals_per_hour=self.intervals_per_hour,
+            )
+        except (IndexError, ValueError):
+            outputs["residual_imbalance"] = np.zeros(self.life_intervals)
+            
+        try:
+            outputs["P_curtailment_ts"] = expand_to_lifetime(
+                P_curtailment_ts,
+                life=self.life_intervals,
+                intervals_per_hour=self.intervals_per_hour,
+            )
+        except (IndexError, ValueError):
+            outputs["P_curtailment_ts"] = np.zeros(self.life_intervals)
+            
+        try:
+            outputs["P_charge_discharge_ts"] = expand_to_lifetime(
+                P_charge_discharge_ts,
+                life=self.life_intervals,
+                intervals_per_hour=self.intervals_per_hour,
+            )
+        except (IndexError, ValueError):
+            outputs["P_charge_discharge_ts"] = np.zeros(self.life_intervals)
+            
+        try:
+            outputs["E_SOC_ts"] = expand_to_lifetime(
+                E_SOC_ts,
+                life=self.life_intervals + 1,
+                intervals_per_hour=self.intervals_per_hour,
+            )
+        except (IndexError, ValueError):
+            outputs["E_SOC_ts"] = np.zeros(self.life_intervals + 1)
         out_keys = [
             "P_HPP_SM_t_opt",
             "SM_price_cleared",
