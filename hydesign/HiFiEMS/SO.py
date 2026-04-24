@@ -30,33 +30,57 @@ class DataReader(DataReaderBase):
 
         scenario_num = self.sim["number_of_scenario"]
 
-        T0 = 96
-        indices = ["DA_" + str(i) for i in range(1, scenario_num + 1)]
-        DA_wind_forecast_scenario = self.Wind_data[indices]
-        DA_wind_forecast_scenario = DA_wind_forecast_scenario.to_numpy().transpose()
-        DA_wind_forecast_scenario = (
-            DA_wind_forecast_scenario[:, 0 : T0 : int(4 / self.DI_num)] * self.PwMax
-        )
+        # Handle data with 1-hour intervals (24 hours per day)
+        # T0 = 96 was for 15-minute intervals, use 24 for hourly
+        T0 = 24
+        
+        # Try to get DA_1 forecast (single scenario), fall back to base DA forecast
+        try:
+            if "DA_1" in self.Wind_data.columns:
+                DA_wind_forecast_scenario = self.Wind_data["DA_1"].values[:T0] * self.PwMax
+            else:
+                DA_wind_forecast_scenario = Inputs["DA_wind_forecast"].values[:T0]
+            # Replicate across scenario_num scenarios
+            DA_wind_forecast_scenario = np.tile(DA_wind_forecast_scenario, (scenario_num, 1))
+        except (KeyError, ValueError):
+            # Fallback: use base DA forecast replicated across scenarios
+            DA_wind_base = Inputs["DA_wind_forecast"].values[:T0]
+            DA_wind_forecast_scenario = np.tile(DA_wind_base, (scenario_num, 1))
 
-        # probability_wind = [1/wind_scenario_num ]*wind_scenario_num
-
-        indices = ["DA_" + str(i) for i in range(1, scenario_num + 1)]
-        DA_solar_forecast_scenario = self.Solar_data[indices]
-        DA_solar_forecast_scenario = DA_solar_forecast_scenario.to_numpy().transpose()
-        DA_solar_forecast_scenario = (
-            DA_solar_forecast_scenario[:, 0 : T0 : int(4 / self.DI_num)] * self.PsMax
-        )
+        # Try to get DA_1 solar forecast (single scenario), fall back to base DA forecast
+        try:
+            if "DA_1" in self.Solar_data.columns:
+                DA_solar_forecast_scenario = self.Solar_data["DA_1"].values[:T0] * self.PsMax
+            else:
+                DA_solar_forecast_scenario = Inputs["DA_solar_forecast"].values[:T0]
+            # Replicate across scenario_num scenarios
+            DA_solar_forecast_scenario = np.tile(DA_solar_forecast_scenario, (scenario_num, 1))
+        except (KeyError, ValueError):
+            # Fallback: use base DA forecast replicated across scenarios
+            DA_solar_base = Inputs["DA_solar_forecast"].values[:T0]
+            DA_solar_forecast_scenario = np.tile(DA_solar_base, (scenario_num, 1))
 
         # probability_solar = [1/solar_scenario_num ]*solar_scenario_num
 
         indices = ["SM_forecast_" + str(i) for i in range(1, scenario_num + 1)]
-        SP_scenario = self.Market_data[indices]
-        SP_scenario = SP_scenario.to_numpy().transpose()
+        try:
+            SP_scenario = self.Market_data[indices]
+            SP_scenario = SP_scenario.to_numpy().transpose()
+        except KeyError:
+            # Fallback: use base spot price forecast replicated across scenarios
+            SP_base = Inputs["SM_price_forecast"].values
+            SP_scenario = np.tile(SP_base, (scenario_num, 1))
+        
         # SP_scenario = SP_scenario[:,0:T0:int(4/DI_num)]
 
         indices = ["reg_forecast_" + str(i) for i in range(1, scenario_num + 1)]
-        RP_scenario = self.Market_data[indices]
-        RP_scenario = RP_scenario.to_numpy().transpose()
+        try:
+            RP_scenario = self.Market_data[indices]
+            RP_scenario = RP_scenario.to_numpy().transpose()
+        except KeyError:
+            # Fallback: use base regulation price forecast replicated across scenarios
+            RP_base = Inputs["Reg_price_forecast"].values
+            RP_scenario = np.tile(RP_base, (scenario_num, 1))
         # RP_scenario = RP_scenario[:,0:T0:int(4/DI_num)]
         if self.sim["probability"] is None:
             probability = [1 / scenario_num] * scenario_num

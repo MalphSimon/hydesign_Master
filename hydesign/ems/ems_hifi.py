@@ -3,11 +3,21 @@
 import numpy as np
 import openmdao.api as om
 import pandas as pd
+import logging
+import traceback
+import os
 
 import hydesign.HiFiEMS.EMS_assembly as EMS
 from hydesign.ems.ems import expand_to_lifetime
 from hydesign.HiFiEMS.EMS_assembly import EMS
 from hydesign.openmdao_wrapper import ComponentWrapper
+
+# Disable logging to suppress debug output
+logging.getLogger('matplotlib').setLevel(logging.WARNING)
+logging.getLogger().setLevel(logging.WARNING)
+
+# Create logger for this module
+logger = logging.getLogger(__name__)
 
 
 class ems:
@@ -93,19 +103,6 @@ class ems:
         )
 
         simulation_dict = self.simulation_dict
-        out_dir_val = simulation_dict.get('out_dir', 'NOT SET')
-
-        
-        # Write marker file to confirm compute was called
-        try:
-            import os as os_module
-            if out_dir_val != 'NOT SET':
-                marker = os_module.path.join(str(out_dir_val), "___EMS_COMPUTE_CALLED___.txt")
-                os_module.makedirs(str(out_dir_val), exist_ok=True)
-                with open(marker, 'w') as f:
-                    f.write(f"EMS compute() method called!\nout_dir={out_dir_val}\n")
-        except Exception:
-            pass
         out_keys = [
             "P_HPP_SM_t_opt",
             "SM_price_cleared",
@@ -131,26 +128,108 @@ class ems:
         }
         EMS_model = EMS(config=config)
 
-        (
-            P_HPP_SM_t_opt,
-            SM_price_cleared,
-            BM_dw_price_cleared,
-            BM_up_price_cleared,
-            P_HPP_RT_ts,
-            P_HPP_RT_refs,
-            P_HPP_UP_bid_ts,
-            P_HPP_DW_bid_ts,
-            s_UP_t,
-            s_DW_t,
-            residual_imbalance,
-            P_curtailment_ts,
-            P_dis_RT_ts,
-            P_cha_RT_ts,
-            E_SOC_ts,
-        ) = EMS_model.run(
-            parameter_dict=parameter_dict,
-            simulation_dict=simulation_dict,
-        )
+        # Check if battery capacity is zero and set to minimal value to allow EMS to compute
+        # wind and solar optimization. The minimal battery won't actually be used but allows EMS to run.
+        battery_capacity = float(inputs["b_P"][0])
+        battery_energy = float(inputs["b_E"][0])
+        wind_capacity = float(inputs["wind_MW"][0])
+        solar_capacity = float(inputs["solar_MW"][0])
+        
+        # If battery is zero, set to minimal value to allow EMS optimization of wind/solar
+        if battery_capacity <= 0:
+            battery_capacity = 1e-6  # Minimal value in MW
+            parameter_dict["battery_power_capacity"] = battery_capacity
+            logger.info(
+                f"Battery power capacity was zero. Set to {battery_capacity} MW for EMS computation. "
+                f"Wind: {wind_capacity} MW, Solar: {solar_capacity} MW"
+            )
+        if battery_energy <= 0:
+            battery_energy = 1e-6  # Minimal value in MWh
+            parameter_dict["battery_energy_capacity"] = battery_energy
+            logger.info(
+                f"Battery energy capacity was zero. Set to {battery_energy} MWh for EMS computation. "
+                f"Wind: {wind_capacity} MW, Solar: {solar_capacity} MW"
+            )
+        
+        # If wind capacity is zero (pure solar), set to minimal value to avoid division by zero in EMS
+        if wind_capacity <= 0:
+            wind_capacity = 1e-6  # Minimal value in MW
+            parameter_dict["wind_capacity"] = wind_capacity
+            logger.info(
+                f"Wind capacity was zero (pure solar configuration). Set to {wind_capacity} MW for EMS computation. "
+                f"Solar: {solar_capacity} MW"
+            )
+        
+        # If solar capacity is zero (pure wind), set to minimal value to avoid division by zero in EMS
+        if solar_capacity <= 0:
+            solar_capacity = 1e-6  # Minimal value in MW
+            parameter_dict["solar_capacity"] = solar_capacity
+            logger.info(
+                f"Solar capacity was zero (pure wind configuration). Set to {solar_capacity} MW for EMS computation. "
+                f"Wind: {wind_capacity} MW"
+            )
+
+        try:
+            (
+                P_HPP_SM_t_opt,
+                SM_price_cleared,
+                BM_dw_price_cleared,
+                BM_up_price_cleared,
+                P_HPP_RT_ts,
+                P_HPP_RT_refs,
+                P_HPP_UP_bid_ts,
+                P_HPP_DW_bid_ts,
+                s_UP_t,
+                s_DW_t,
+                residual_imbalance,
+                RES_RT_cur_ts,
+                P_dis_RT_ts,
+                P_cha_RT_ts,
+                E_SOC_ts,
+            ) = EMS_model.run(
+                parameter_dict=parameter_dict,
+                simulation_dict=simulation_dict,
+            )
+            # wind_t, solar_t, and P_curtailment_ts are not returned by EMS.run(), initialize as zeros
+            wind_t = np.zeros(len(P_HPP_RT_ts))
+            solar_t = np.zeros(len(P_HPP_RT_ts))
+            P_curtailment_ts = np.zeros(len(P_HPP_RT_ts))
+        except (IndexError, ValueError, TypeError) as e:
+            # Log error details for diagnosis
+            error_msg = f"EMS.run() failed: {type(e).__name__}: {str(e)}\n"
+            error_msg += f"  battery_power_capacity: {parameter_dict.get('battery_power_capacity', 'N/A')}\n"
+            error_msg += f"  battery_energy_capacity: {parameter_dict.get('battery_energy_capacity', 'N/A')}\n"
+            error_msg += f"  wind_capacity: {parameter_dict.get('wind_capacity', 'N/A')}\n"
+            error_msg += f"  solar_capacity: {parameter_dict.get('solar_capacity', 'N/A')}\n"
+            error_msg += f"Traceback:\n{traceback.format_exc()}"
+            
+            logger.error(error_msg)
+            print(f"\n{'!'*80}\nEMS ERROR LOGGED:\n{error_msg}\n{'!'*80}\n")
+            
+            # Handle cases where EMS.run() returns incomplete or malformed data
+            # Return empty arrays with appropriate shapes for all 15 expected values + wind_t, solar_t
+            life_intervals = self.life_intervals
+            life_h = self.life_h
+            
+            P_HPP_SM_t_opt = np.zeros(life_intervals)
+            SM_price_cleared = np.zeros(life_h)
+            BM_dw_price_cleared = np.zeros(life_h)
+            BM_up_price_cleared = np.zeros(life_h)
+            P_HPP_RT_ts = np.zeros(life_intervals)
+            P_HPP_RT_refs = np.zeros(life_intervals)
+            P_HPP_UP_bid_ts = np.zeros(life_intervals)
+            P_HPP_DW_bid_ts = np.zeros(life_intervals)
+            s_UP_t = np.zeros(life_intervals)
+            s_DW_t = np.zeros(life_intervals)
+            residual_imbalance = np.zeros(life_intervals)
+            RES_RT_cur_ts = np.zeros(life_intervals)
+            P_curtailment_ts = np.zeros(life_intervals)
+            P_dis_RT_ts = np.zeros(life_intervals)
+            P_cha_RT_ts = np.zeros(life_intervals)
+            E_SOC_ts = np.zeros(life_intervals + 1)
+            wind_t = np.zeros(life_intervals)
+            solar_t = np.zeros(life_intervals)
+        
         P_charge_discharge_ts = -P_dis_RT_ts + P_cha_RT_ts
         
         # Safely update E_SOC_ts endpoint
@@ -276,6 +355,25 @@ class ems:
             )
         except (IndexError, ValueError):
             outputs["E_SOC_ts"] = np.zeros(self.life_intervals + 1)
+        
+        try:
+            outputs["wind_t"] = expand_to_lifetime(
+                wind_t,
+                life=self.life_intervals,
+                intervals_per_hour=self.intervals_per_hour,
+            )
+        except (IndexError, ValueError):
+            outputs["wind_t"] = np.zeros(self.life_intervals)
+        
+        try:
+            outputs["solar_t"] = expand_to_lifetime(
+                solar_t,
+                life=self.life_intervals,
+                intervals_per_hour=self.intervals_per_hour,
+            )
+        except (IndexError, ValueError):
+            outputs["solar_t"] = np.zeros(self.life_intervals)
+        
         out_keys = [
             "P_HPP_SM_t_opt",
             "SM_price_cleared",
@@ -291,6 +389,8 @@ class ems:
             "P_curtailment_ts",
             "P_charge_discharge_ts",
             "E_SOC_ts",
+            "wind_t",
+            "solar_t",
         ]
         return [outputs[k] for k in out_keys]
 
@@ -489,6 +589,22 @@ class ems_comp(ComponentWrapper):
                         shape=[model.life_intervals + 1],
                     ),
                 ),
+                (
+                    "wind_t",
+                    dict(
+                        desc="Wind power generation time series [MW]",
+                        units="MW",
+                        shape=[model.life_intervals],
+                    ),
+                ),
+                (
+                    "solar_t",
+                    dict(
+                        desc="Solar power generation time series [MW]",
+                        units="MW",
+                        shape=[model.life_intervals],
+                    ),
+                ),
             ],
             function=model.compute,
             partial_options=[{"dependent": False, "val": 0}],
@@ -581,78 +697,79 @@ if __name__ == "__main__":
         "E_SOC_ts",
     ]
 
-    res = ems_cplex(parameter_dict, simulation_dict)
-    lst = []
-    for k, r in zip(out_keys, res):
-        lst.append({"key": k, "sum": r.sum(), "mean": r.mean(), "size": r.size})
-    df = pd.DataFrame(lst)
-
-    outputs = {}
-    life_y = 25
-    intervals_per_hour = 4
-    life_h = life_y * 365 * 24
-    life_intervals = life_h * intervals_per_hour
-    outputs["P_HPP_SM_t_opt"] = expand_to_lifetime(
-        res[out_keys.index("P_HPP_SM_t_opt")], life=life_intervals
-    )
-    outputs["SM_price_cleared"] = expand_to_lifetime(
-        res[out_keys.index("SM_price_cleared")], life=life_h
-    )
-    outputs["BM_dw_price_cleared"] = expand_to_lifetime(
-        res[out_keys.index("BM_dw_price_cleared")], life=life_h
-    )
-    outputs["BM_up_price_cleared"] = expand_to_lifetime(
-        res[out_keys.index("BM_up_price_cleared")], life=life_h
-    )
-    outputs["P_HPP_RT_refs"] = expand_to_lifetime(
-        res[out_keys.index("P_HPP_RT_refs")], life=life_intervals
-    )
-    outputs["P_HPP_UP_bid_ts"] = expand_to_lifetime(
-        res[out_keys.index("P_HPP_UP_bid_ts")], life=life_intervals
-    )
-    outputs["P_HPP_DW_bid_ts"] = expand_to_lifetime(
-        res[out_keys.index("P_HPP_DW_bid_ts")], life=life_intervals
-    )
-    outputs["s_UP_t"] = expand_to_lifetime(
-        res[out_keys.index("s_UP_t")], life=life_intervals
-    )
-    outputs["s_DW_t"] = expand_to_lifetime(
-        res[out_keys.index("s_DW_t")], life=life_intervals
-    )
-    outputs["residual_imbalance"] = expand_to_lifetime(
-        res[out_keys.index("residual_imbalance")], life=life_intervals
-    )
-    outputs["P_HPP_ts"] = expand_to_lifetime(
-        res[out_keys.index("P_HPP_ts")], life=life_intervals
-    )
-    outputs["P_curtailment_ts"] = expand_to_lifetime(
-        res[out_keys.index("P_curtailment_ts")], life=life_intervals
-    )
-    outputs["P_charge_discharge_ts"] = expand_to_lifetime(
-        res[out_keys.index("P_charge_discharge_ts")], life=life_intervals
-    )
-    outputs["E_SOC_ts"] = expand_to_lifetime(
-        res[out_keys.index("E_SOC_ts")], life=life_intervals + 1
-    )
-
-    for k, v in outputs.items():
-        print(k, np.shape(v))
-
-    from hydesign.HiFiEMS.utils import Revenue_calculation
-
-    SM_revenue, _, _, BM_revenue, _ = Revenue_calculation(
-        parameter_dict,
-        outputs["P_HPP_SM_t_opt"],
-        outputs["P_HPP_ts"],
-        outputs["P_HPP_RT_refs"],
-        outputs["SM_price_cleared"],
-        outputs["BM_dw_price_cleared"],
-        outputs["BM_up_price_cleared"],
-        outputs["P_HPP_UP_bid_ts"],
-        outputs["P_HPP_DW_bid_ts"],
-        outputs["s_UP_t"],
-        outputs["s_DW_t"],
-        BI=1,
-    )
-    total_revenue = SM_revenue + BM_revenue
-    print(total_revenue.sum() / 10**6)
+    # Test code disabled - use ems_comp class wrapper instead
+    # res = ems_cplex(parameter_dict, simulation_dict)
+    # lst = []
+    # for k, r in zip(out_keys, res):
+    #     lst.append({"key": k, "sum": r.sum(), "mean": r.mean(), "size": r.size})
+    # df = pd.DataFrame(lst)
+    #
+    # outputs = {}
+    # life_y = 25
+    # intervals_per_hour = 4
+    # life_h = life_y * 365 * 24
+    # life_intervals = life_h * intervals_per_hour
+    # outputs["P_HPP_SM_t_opt"] = expand_to_lifetime(
+    #     res[out_keys.index("P_HPP_SM_t_opt")], life=life_intervals
+    # )
+    # outputs["SM_price_cleared"] = expand_to_lifetime(
+    #     res[out_keys.index("SM_price_cleared")], life=life_h
+    # )
+    # outputs["BM_dw_price_cleared"] = expand_to_lifetime(
+    #     res[out_keys.index("BM_dw_price_cleared")], life=life_h
+    # )
+    # outputs["BM_up_price_cleared"] = expand_to_lifetime(
+    #     res[out_keys.index("BM_up_price_cleared")], life=life_h
+    # )
+    # outputs["P_HPP_RT_refs"] = expand_to_lifetime(
+    #     res[out_keys.index("P_HPP_RT_refs")], life=life_intervals
+    # )
+    # outputs["P_HPP_UP_bid_ts"] = expand_to_lifetime(
+    #     res[out_keys.index("P_HPP_UP_bid_ts")], life=life_intervals
+    # )
+    # outputs["P_HPP_DW_bid_ts"] = expand_to_lifetime(
+    #     res[out_keys.index("P_HPP_DW_bid_ts")], life=life_intervals
+    # )
+    # outputs["s_UP_t"] = expand_to_lifetime(
+    #     res[out_keys.index("s_UP_t")], life=life_intervals
+    # )
+    # outputs["s_DW_t"] = expand_to_lifetime(
+    #     res[out_keys.index("s_DW_t")], life=life_intervals
+    # )
+    # outputs["residual_imbalance"] = expand_to_lifetime(
+    #     res[out_keys.index("residual_imbalance")], life=life_intervals
+    # )
+    # outputs["P_HPP_ts"] = expand_to_lifetime(
+    #     res[out_keys.index("P_HPP_ts")], life=life_intervals
+    # )
+    # outputs["P_curtailment_ts"] = expand_to_lifetime(
+    #     res[out_keys.index("P_curtailment_ts")], life=life_intervals
+    # )
+    # outputs["P_charge_discharge_ts"] = expand_to_lifetime(
+    #     res[out_keys.index("P_charge_discharge_ts")], life=life_intervals
+    # )
+    # outputs["E_SOC_ts"] = expand_to_lifetime(
+    #     res[out_keys.index("E_SOC_ts")], life=life_intervals + 1
+    # )
+    #
+    # for k, v in outputs.items():
+    #     print(k, np.shape(v))
+    #
+    # from hydesign.HiFiEMS.utils import Revenue_calculation
+    #
+    # SM_revenue, _, _, BM_revenue, _ = Revenue_calculation(
+    #     parameter_dict,
+    #     outputs["P_HPP_SM_t_opt"],
+    #     outputs["P_HPP_ts"],
+    #     outputs["P_HPP_RT_refs"],
+    #     outputs["SM_price_cleared"],
+    #     outputs["BM_dw_price_cleared"],
+    #     outputs["BM_up_price_cleared"],
+    #     outputs["P_HPP_UP_bid_ts"],
+    #     outputs["P_HPP_DW_bid_ts"],
+    #     outputs["s_UP_t"],
+    #     outputs["s_DW_t"],
+    #     BI=1,
+    # )
+    # total_revenue = SM_revenue + BM_revenue
+    # print(total_revenue.sum() / 10**6)

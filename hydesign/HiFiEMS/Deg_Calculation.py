@@ -96,30 +96,17 @@ def Deg_Model(whole_SoC, Ini_nld, pre_nld, ld1, nld1, days):
 
 
 def slope_update(whole_Pdis, whole_Pcha, whole_nld, days, up_freq, T, DI, ad_all): 
-    # Convert to numeric in case CSV contained strings
-    try:
-        Pdis_vals = pd.to_numeric(whole_Pdis.iloc[-T:,0], errors='coerce')
-        Pcha_vals = pd.to_numeric(whole_Pcha.iloc[-T:,0], errors='coerce')
-        Pdis_vals_long = pd.to_numeric(whole_Pdis.iloc[-T*up_freq:,0], errors='coerce')
-        Pcha_vals_long = pd.to_numeric(whole_Pcha.iloc[-T*up_freq:,0], errors='coerce')
-    except:
-        Pdis_vals = whole_Pdis.iloc[-T:,0]
-        Pcha_vals = whole_Pcha.iloc[-T:,0]
-        Pdis_vals_long = whole_Pdis.iloc[-T*up_freq:,0]
-        Pcha_vals_long = whole_Pcha.iloc[-T*up_freq:,0]
-    
-    throughput = (Pdis_vals + Pcha_vals).sum()
-    if throughput == 0:
+    throughput = (whole_Pdis.iloc[-T:,0] + whole_Pcha.iloc[-T:,0]).sum()
+    if throughput ==0:
         ad = ad_all.iloc[-1,0]
     else:        
-        # Check if we have enough historical data
-        if days < up_freq + 1 or len(whole_nld) < up_freq + 1:
-           # Not enough history yet, use first default value
+        if days<up_freq+1:
+           #ad = (whole_nld.iloc[-1,0] - whole_nld.iloc[-2,0])/(whole_Pdis.iloc[-T:,0] + whole_Pcha.iloc[-T:,0]).sum()/DI
            ad = ad_all.iloc[0,0]
         else:
-           ad = (whole_nld.iloc[-1,0] - whole_nld.iloc[-(up_freq+1),0])/(Pdis_vals_long + Pcha_vals_long).sum()/DI
-        if ad < 0:
-            ad = 1e-8            
+           ad = (whole_nld.iloc[-1,0] - whole_nld.iloc[-(up_freq+1),0])/(whole_Pdis.iloc[-T*up_freq:,0] + whole_Pcha.iloc[-T*up_freq:,0]).sum()/DI
+        if ad<0:
+            ad=1e-8            
         
     return ad
 

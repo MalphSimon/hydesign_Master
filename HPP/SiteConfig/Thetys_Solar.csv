@@ -2,7 +2,7 @@
 clearance [m],27.0
 sp [W/m2],343.0
 p_rated [MW],15.0
-Nwt,0.0
+Nwt,0
 wind_MW_per_km2 [MW/km2],5.0
 solar_MW [MW],963.9187298281525
 surface_tilt [deg],5.00868615539925

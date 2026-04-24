@@ -2,7 +2,7 @@ import pandas as pd
 import os
 
 # --- Configuration ---
-input_file = r"C:\Users\malth\HPP\hydesign\hydesign\examples\Europe\GWA2\input_ts_Siciliy_South_onshore.csv"
+input_file = r"C:\Users\malth\HPP\hydesign\hydesign\examples\Europe\GWA2\input_ts_Thetys_DA.csv"
 output_path_power = r"C:\Users\malth\HPP\hydesign\hydesign\examples\HiFiEMS_inputs\Power"
 output_path_market = r"C:\Users\malth\HPP\hydesign\hydesign\examples\HiFiEMS_inputs\Market"
 
@@ -12,7 +12,7 @@ market_cols = [
     "BM_Up_cleared", "BM_Down_cleared", "reg_cleared", "reg_forecast_1",
     "reg_forecast_2", "reg_forecast_3", "reg_vol_Up", "reg_vol_Down"
 ]
-suffix = "_IT"
+suffix = "_NLda"
 
 os.makedirs(output_path_power, exist_ok=True)
 os.makedirs(output_path_market, exist_ok=True)
@@ -38,8 +38,8 @@ def split_data():
         # --- 1. Wind Data ---
         wind_export = pd.DataFrame()
         wind_export['time'] = year_df['time']
-        wind_export['Measurement'] = year_df['WS_150']
-        wind_export['DA_1'] = year_df['WS_150']
+        wind_export['Measurement'] = year_df['WP_150']
+        wind_export['DA_1'] = year_df['WP_150_DA']
         for col in power_cols_to_zero:
             wind_export[col] = 0
         wind_export.to_csv(os.path.join(output_path_power, f"Winddata{int(year)}{suffix}.csv"), index=False)
@@ -48,7 +48,7 @@ def split_data():
         solar_export = pd.DataFrame()
         solar_export['time'] = year_df['time']
         solar_export['Measurement'] = year_df['SP']
-        solar_export['DA_1'] = year_df['SP']
+        solar_export['DA_1'] = year_df['SP_DA']
         for col in power_cols_to_zero:
             solar_export[col] = 0
         solar_export.to_csv(os.path.join(output_path_power, f"Solardata{int(year)}{suffix}.csv"), index=False)

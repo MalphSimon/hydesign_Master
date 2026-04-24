@@ -1,2 +1,0 @@
-EMS compute() method called!
-out_dir=C:\Users\malth\HPP\hydesign\test

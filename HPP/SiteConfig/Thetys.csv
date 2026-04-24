@@ -9,7 +9,7 @@ surface_tilt [deg],16.6209
 surface_azimuth [deg],180.0
 DC_AC_ratio,1.0
 b_P [MW],0.0
-b_E_h [h],1.0
+b_E_h [h],0.0
 cost_of_battery_P_fluct_in_peak_price_ratio,17.898
 name,Thetys
 longitude,4.193

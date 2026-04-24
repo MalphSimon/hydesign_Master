@@ -1,6 +1,6 @@
 """
 Evaluation of Hybrid Power Plants (HPPs) using HiFiEMS-specific configuration files.
-MODIFIED: Now includes hourly production export.
+FIXED: Price adjustment now correctly modifies the market file and updates sim_pars.
 """
 
 import argparse
@@ -12,32 +12,10 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 
-# Global placeholders for dynamic imports
-hpp_model = None
-examples_filepath = None
-calculate_bankability_metrics = None
+# --- Helper Functions ---
 
-def _init_local_hydesign_imports():
-    global hpp_model
-    global examples_filepath
-    global calculate_bankability_metrics
-
-    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if repo_root not in sys.path:
-        sys.path.insert(0, repo_root)
-
-    from HPP.HelperFunctions.Bankability import (
-        calculate_bankability_metrics as local_calculate_bankability_metrics,
-    )
-    from hydesign.assembly.hpp_assembly_hifi import hpp_model as local_hpp_model
-    from hydesign.examples import examples_filepath as local_examples_filepath
-
-    calculate_bankability_metrics = local_calculate_bankability_metrics
-    hpp_model = local_hpp_model
-    examples_filepath = local_examples_filepath
-
-def _get_site_row(site_name):
-    examples_sites = pd.read_csv(f"{examples_filepath}examples_sites.csv", index_col=0, sep=";")
+def _get_site_row(site_name, examples_filepath):
+    examples_sites = pd.read_csv(os.path.join(examples_filepath, "examples_sites.csv"), index_col=0, sep=";")
     ex_site = examples_sites.loc[examples_sites.name == site_name]
     if ex_site.empty:
         raise ValueError(f"Site '{site_name}' not found in examples_sites.csv.")
@@ -71,23 +49,7 @@ def _load_site_design(site_name, site_config_dir):
         "cost_of_batt_degr": float(values.loc["cost_of_battery_P_fluct_in_peak_price_ratio"]),
     }
 
-def _build_design_vector(design):
-    return [
-        design["clearance"], design["sp"], design["p_rated"], design["Nwt"],
-        design["wind_MW_per_km2"], design["solar_MW"], design["surface_tilt"],
-        design["surface_azimuth"], design["DC_AC_ratio"], design["b_P"],
-        design["b_E_h"], design["cost_of_batt_degr"]
-    ]
-
-def _read_input_ts(input_ts_fn):
-    input_ts = pd.read_csv(input_ts_fn, index_col=0, parse_dates=False, sep=None, engine="python")
-    input_ts.index = pd.to_datetime(input_ts.index, errors="coerce", dayfirst=True)
-    if not isinstance(input_ts.index, pd.DatetimeIndex):
-        raise ValueError(f"Input time series index is not datetime: {input_ts_fn}")
-    return input_ts.sort_index()
-
 def _get_prob_var(prob, var_names):
-    """Utility to extract values from OpenMDAO problem."""
     if isinstance(var_names, str): var_names = [var_names]
     for var_name in var_names:
         try:
@@ -97,157 +59,201 @@ def _get_prob_var(prob, var_names):
             except: continue
     return None
 
-def evaluate_hifiems_site(site_name, start_year, end_year, lifetime_years, price_add, output_csv=None, save_hourly=True):
-    _init_local_hydesign_imports()
-    
-    ex_site = _get_site_row(site_name)
-    sim_pars_fn = examples_filepath + ex_site["sim_pars_fn"]
-    input_ts_fn = examples_filepath + ex_site["input_ts_fn"]
-    
-    base_site_name = site_name.replace("_HiFiEMS", "")
-    site_config_dir = _get_site_config_dir()
-    design = _load_site_design(base_site_name, site_config_dir)
-    design_x = _build_design_vector(design)
+def _read_input_ts(input_ts_fn):
+    input_ts = pd.read_csv(input_ts_fn, index_col=0, parse_dates=False, sep=None, engine="python")
+    input_ts.index = pd.to_datetime(input_ts.index, errors="coerce", dayfirst=True)
+    if not isinstance(input_ts.index, pd.DatetimeIndex):
+        raise ValueError(f"Input time series index is not datetime: {input_ts_fn}")
+    return input_ts.sort_index()
 
-    input_ts = _read_input_ts(input_ts_fn)
-    yearly_groups = {year: group for year, group in input_ts.groupby(input_ts.index.year)}
+# --- Worker Function (Isolated) ---
 
-    def evaluate_single_year(year, temp_dir):
-        year_df = yearly_groups.get(year, pd.DataFrame()).copy()
-        if year_df.empty: raise ValueError(f"No data for year {year}")
+def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_pars_fn, 
+                        year_df, design, lifetime_years, price_add, save_hourly, ex_site):
+    try:
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if repo_root not in sys.path:
+            sys.path.insert(0, repo_root)
 
-        if price_add != 0:
-            price_cols = [col for col in year_df.columns if 'price' in col.lower()]
-            for col in price_cols: year_df[col] = year_df[col] + price_add
-
-        year_input_ts_fn = os.path.join(temp_dir, f"input_ts_{site_name}_{year}.csv")
-        year_df.to_csv(year_input_ts_fn, sep=";")
-
+        from hydesign.assembly.hpp_assembly_hifi import hpp_model
+        
+        # 1. Isolated Workspace
+        year_temp_dir = os.path.join(parent_temp_dir, f"year_{year}")
+        os.makedirs(year_temp_dir, exist_ok=True)
+        
+        # 2. Load and Prepare Config
         with open(sim_pars_fn, "r") as f:
             sim_pars = yaml.safe_load(f)
-
-        out_dir = sim_pars.get('out_dir', 'Not specified')
-        abs_out_dir = os.path.abspath(out_dir)
         
-        # Ensure output directory exists
-        os.makedirs(abs_out_dir, exist_ok=True)
-        
-        # Update sim_pars to use absolute path for out_dir (no trailing separator, os.path.join handles it)
-        sim_pars['out_dir'] = abs_out_dir
+        sim_pars['out_dir'] = os.path.abspath(year_temp_dir)
 
-        hifiems_dir = os.path.join(os.path.dirname(os.path.dirname(sim_pars_fn)), "HiFiEMS_inputs")
-        site_suffix_map = {
-            "NordsoenMidt": "DK", "Golfe_du_Lion": "FRs", "Sud_Atlantique": "FRw",
-            "Thetys": "NL", "SicilySouth": "IT", "Vestavind": "NO",
+        # 3. Resolve Data Paths
+        hifiems_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(sim_pars_fn)), "HiFiEMS_inputs"))
+        suffix_map = {
+            "NordsoenMidt": "DK", "Golfe_du_Lion": "FRs", "Sud_Atlantique": "FRw", 
+            "Sud_Atlantique_Solar": "FRw", "Sud_Atlantique_Wind": "FRw",
+            "Thetys": "NLda", "Thetys_Solar": "NLda", "Thetys_Wind": "NLda", 
+            "SicilySouth": "IT", "Vestavind": "NO"
         }
-        suffix = site_suffix_map.get(base_site_name, "")
+        suffix = suffix_map.get(base_site_name, "")
         
-        # Use absolute paths to avoid working directory issues
-        hifiems_dir_abs = os.path.abspath(hifiems_dir)
-        sim_pars["wind_fn"] = os.path.join(hifiems_dir_abs, f"Power/Winddata{year}_{suffix}.csv")
-        sim_pars["solar_fn"] = os.path.join(hifiems_dir_abs, f"Power/Solardata{year}_{suffix}.csv")
-        sim_pars["market_fn"] = os.path.join(hifiems_dir_abs, f"Market/Market{year}_{suffix}.csv")
+        sim_pars["wind_fn"] = os.path.join(hifiems_dir, f"Power/Winddata{year}_{suffix}.csv")
+        sim_pars["solar_fn"] = os.path.join(hifiems_dir, f"Power/Solardata{year}_{suffix}.csv")
+        market_fn_orig = os.path.join(hifiems_dir, f"Market/Market{year}_{suffix}.csv")
 
-        temp_yaml_fn = os.path.join(temp_dir, f"hpp_pars_{site_name}_{year}.yml")
-        with open(temp_yaml_fn, "w") as f_yaml: yaml.dump(sim_pars, f_yaml)
+        # 4. CRITICAL: Handle Price Adjustment with "Surgical" precision
+        if price_add != 0:
+            market_fn_adj = os.path.join(year_temp_dir, f"Market{year}_adj.csv")
+            
+            with open(market_fn_orig, 'r') as f:
+                lines = f.readlines()
+            
+            # Detect delimiter (market files use comma, not semicolon)
+            header_line = lines[0].strip()
+            delimiter = ',' if ',' in header_line else ';'
+            
+            # Identify which columns to adjust from the header
+            # Target: cleared prices (SM_cleared, BM_Up_cleared, BM_Down_cleared, reg_cleared)
+            # and forecast columns (SM_forecast, reg_forecast)
+            header = header_line.split(delimiter)
+            target_indices = [i for i, col in enumerate(header) 
+                             if 'cleared' in col.lower() or 'forecast' in col.lower()]
+            
+            new_lines = [lines[0]] # Keep original header line
+            for line in lines[1:]:
+                parts = line.strip().split(delimiter)
+                for idx in target_indices:
+                    try:
+                        # Add the price adjustment to the numeric value
+                        val = float(parts[idx])
+                        parts[idx] = str(val + price_add)
+                    except (ValueError, IndexError):
+                        continue
+                new_lines.append(delimiter.join(parts) + '\n')
+            
+            with open(market_fn_adj, 'w') as f:
+                f.writelines(new_lines)
+            
+            sim_pars["market_fn"] = market_fn_adj
+            print(f"Worker {year}: Surgically adjusted {len(target_indices)} price columns in Market file with delimiter '{delimiter}'.", file=sys.stderr)
+        else:
+            sim_pars["market_fn"] = market_fn_orig
 
+        # 5. Save Worker-Specific YAML
+        temp_yaml_fn = os.path.join(year_temp_dir, f"hpp_pars_{year}.yml")
+        with open(temp_yaml_fn, "w") as f_yaml:
+            yaml.dump(sim_pars, f_yaml)
+
+        # 6. Prepare Input TS (Saved for model initialization)
+        year_input_ts_fn = os.path.join(year_temp_dir, f"input_ts_{site_name}_{year}.csv")
+        year_df.to_csv(year_input_ts_fn, sep=";")
+
+        # 7. Model Evaluation
         hpp = hpp_model(
             latitude=ex_site["latitude"], longitude=ex_site["longitude"], altitude=ex_site["altitude"],
-            num_batteries=5, work_dir=temp_dir, sim_pars_fn=temp_yaml_fn, input_ts_fn=year_input_ts_fn,
+            num_batteries=5, work_dir=year_temp_dir, sim_pars_fn=temp_yaml_fn, input_ts_fn=year_input_ts_fn,
         )
-
-        # Calculate wind_MW from turbine parameters (Nwt * p_rated)
+        
         wind_MW = design["Nwt"] * design["p_rated"]
+        outs = hpp.evaluate(wind_MW, design["solar_MW"], design["b_P"], design["b_E_h"], design["wind_MW_per_km2"])
+        eval_df = hpp.evaluation_in_df(None, outs)
         
-        # HiFiEMS evaluate() takes: wind_MW, solar_MW, b_P, b_E_h, wind_MW_per_km2
-        # Pass original values - if b_P is 0, EMS should handle it (no battery optimization)
-        try:
-            outs = hpp.evaluate(wind_MW, design["solar_MW"], design["b_P"], design["b_E_h"], design["wind_MW_per_km2"])
-            eval_df = hpp.evaluation_in_df(None, outs)
-            row = eval_df.iloc[0].to_dict()
-            row.update({"site": site_name, "weather_year": year, "lifetime_years": lifetime_years, "price_added": price_add})
-            row.update(calculate_bankability_metrics(row))
-        except Exception as e:
-            print(f"ERROR: Year {year} evaluation failed: {type(e).__name__}: {str(e)[:200]}")
-            # Return a minimal row with NaN values for failed year
-            row = {
-                "site": site_name, "weather_year": year, "lifetime_years": lifetime_years, 
-                "price_added": price_add, "NPV [MEuro]": np.nan, "IRR": np.nan,
-                "LCOE [Euro/MWh]": np.nan, "Mean Annual Electricity Sold [GWh]": np.nan
-            }
-            hourly_df = None
-            return row, hourly_df
-
-        # --- COPY EMS OUTPUT FILES BEFORE TEMP DIR IS DELETED ---
-        out_dir = os.path.abspath(sim_pars.get('out_dir', './test/'))
-        if os.path.exists(out_dir):
-            import shutil
-            ems_files = ['act_signal.csv', 'curtailment.csv', 'Degradation.csv', 
-                        'energy_imbalance.csv', 'revenue.csv', 'schedule.csv', 'slope.csv', 'SoC.csv']
-            for fname in ems_files:
-                temp_file = os.path.join(temp_dir, fname)
-                out_file = os.path.join(out_dir, fname)
-                if os.path.exists(temp_file):
-                    try:
-                        shutil.copy2(temp_file, out_file)
-                    except Exception:
-                        pass
+        row = eval_df.iloc[0].to_dict()
+        row.update({"site": site_name, "weather_year": year, "lifetime_years": lifetime_years, "price_added": price_add})
         
-        # --- Extraction of Hourly Data ---
         hourly_df = None
         if save_hourly:
             wind_t = _get_prob_var(hpp.prob, "wind_t")
             solar_t = _get_prob_var(hpp.prob, "solar_t")
             b_t = _get_prob_var(hpp.prob, "b_t")
             
+            # Extract market prices from EMS model (hourly resolution)
+            # SM_price_cleared is the spot market cleared price (hourly)
+            sm_price_cleared = _get_prob_var(hpp.prob, "SM_price_cleared")
+            bm_up_price = _get_prob_var(hpp.prob, "BM_up_price_cleared")
+            bm_dw_price = _get_prob_var(hpp.prob, "BM_dw_price_cleared")
+            
             hourly_df = pd.DataFrame({
                 "time": year_df.index,
                 "weather_year": year,
                 "wind_MW": wind_t[:len(year_df)] if wind_t is not None else 0,
                 "solar_MW": solar_t[:len(year_df)] if solar_t is not None else 0,
-                "battery_MW": b_t[:len(year_df)] if b_t is not None else 0
+                "battery_MW": b_t[:len(year_df)] if b_t is not None else 0,
+                "SM_price_cleared": sm_price_cleared[:len(year_df)] if sm_price_cleared is not None else np.nan,
+                "BM_up_price": bm_up_price[:len(year_df)] if bm_up_price is not None else np.nan,
+                "BM_dw_price": bm_dw_price[:len(year_df)] if bm_dw_price is not None else np.nan,
             })
-        
         return row, hourly_df
+    
+    except Exception as e:
+        # Using stderr ensures error messages are more likely to appear in the console during parallel runs
+        print(f"Error evaluating year {year}: {e}", file=sys.stderr)
+        return {"weather_year": year, "error": str(e)}, None
+
+# --- Core Execution Logic ---
+
+def evaluate_hifiems_site(site_name, start_year, end_year, lifetime_years, price_add, output_csv=None, save_hourly=True):
+    repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if repo_root not in sys.path:
+        sys.path.insert(0, repo_root)
+
+    from hydesign.examples import examples_filepath
+
+    ex_site = _get_site_row(site_name, examples_filepath)
+    sim_pars_fn = os.path.join(examples_filepath, ex_site["sim_pars_fn"])
+    input_ts_fn = os.path.join(examples_filepath, ex_site["input_ts_fn"])
+    
+    base_site_name = site_name.replace("_HiFiEMS", "")
+    site_config_dir = _get_site_config_dir()
+    design = _load_site_design(base_site_name, site_config_dir)
+
+    input_ts = _read_input_ts(input_ts_fn)
+    yearly_groups = {year: group for year, group in input_ts.groupby(input_ts.index.year)}
+
+    years_to_run = [y for y in range(start_year, end_year + 1) if y in yearly_groups]
+
+    print(f"Starting evaluation for {site_name} (Price Add: {price_add})...")
 
     with tempfile.TemporaryDirectory(prefix=f"hifiems_eval_{site_name}_") as temp_dir:
-        results = Parallel(n_jobs=-1, verbose=10)(
-            delayed(evaluate_single_year)(year, temp_dir)
-            for year in range(start_year, end_year + 1)
+        parallel_results = Parallel(n_jobs=-1, verbose=10)(
+            delayed(evaluate_single_year)(
+                year, temp_dir, site_name, base_site_name, sim_pars_fn, 
+                yearly_groups[year], design, lifetime_years, price_add, save_hourly, ex_site
+            )
+            for year in years_to_run
         )
-    
-    # Save Annual Metrics
-    rows = [r for r, h in results]
-    results_df = pd.DataFrame(rows)
-    if output_csv is None:
-        output_csv = f"{site_name}_eval_{start_year}_{end_year}.csv"
-    results_df.to_csv(output_csv, index=False)
 
-    # Save Aggregated Hourly Data
+    summary_rows = [res[0] for res in parallel_results if res[0] is not None]
+    summary_df = pd.DataFrame(summary_rows)
+    
+    if output_csv:
+        summary_df.to_csv(output_csv, index=False)
+        print(f"Results saved to {output_csv}")
+
     if save_hourly:
-        hourly_list = [h for r, h in results if h is not None]
+        hourly_list = [res[1] for res in parallel_results if res[1] is not None]
         if hourly_list:
-            hourly_all = pd.concat(hourly_list, axis=0)
+            master_hourly = pd.concat(hourly_list)
             hourly_path = output_csv.replace(".csv", "_hourly.csv")
-            hourly_all.to_csv(hourly_path, index=False)
+            master_hourly.to_csv(hourly_path, index=False)
+            print(f"Hourly production saved to {hourly_path}")
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sites", default="Golfe_du_Lion_HiFiEMS", help="Comma-separated list of site names to evaluate (e.g. 'Sud_Atlantique_HiFiEMS,Thetys_HiFiEMS')            ")
+    parser.add_argument("--sites", default="Thetys_Solar_HiFiEMS", help="Comma-separated sites")
     parser.add_argument("--start-year", type=int, default=1982)
     parser.add_argument("--end-year", type=int, default=1992)
     parser.add_argument("--lifetime-years", type=int, default=25)
-    parser.add_argument("--price-add", type=float, default=42)
+    parser.add_argument("--price-add", type=float, default=42.0)
     args = parser.parse_args()
 
-    _init_local_hydesign_imports()
     site_names = [s.strip() for s in args.sites.split(",") if s.strip()]
     
-    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Evaluations", "HiFiEMS")
+    output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Evaluations", "HiFiEMS", "New")
     os.makedirs(output_dir, exist_ok=True)
 
     for site in site_names:
-        csv_path = os.path.join(output_dir, f"{site}_eval_{args.start_year}_{args.end_year}.csv")
+        csv_path = os.path.join(output_dir, f"{site}_eval_{args.start_year}_{args.end_year}_p{args.price_add}.csv")
         evaluate_hifiems_site(site, args.start_year, args.end_year, args.lifetime_years, args.price_add, csv_path)
 
 if __name__ == "__main__":

@@ -59,17 +59,6 @@ class hpp_model(hpp_base):
             if sim_pars["data_dir"] is not None:
                 data_dir = sim_pars["data_dir"]
 
-        out_dir_for_marker = sim_pars.get("out_dir", "NOT SET")
-        out_dir_abs = os.path.abspath(out_dir_for_marker)
-        
-        try:
-            test_marker = os.path.join(out_dir_abs, "___SETUP_CALLED___.txt")
-            os.makedirs(out_dir_abs, exist_ok=True)
-            with open(test_marker, 'w') as f:
-                f.write(f"HPP setup() called. out_dir={out_dir_for_marker}, absolute={out_dir_abs}\n")
-        except Exception as e:
-            pass
-
         Wind_data = pd.read_csv(os.path.join(data_dir, sim_pars["wind_fn"]))
         Solar_data = pd.read_csv(os.path.join(data_dir, sim_pars["solar_fn"]))
         Market_data = pd.read_csv(os.path.join(data_dir, sim_pars["market_fn"]))
@@ -400,19 +389,6 @@ class hpp_model(hpp_base):
         prob.run_model()
 
         self.prob = prob
-        
-        # Debug: Check if key outputs are valid
-        try:
-            npv_val = prob["NPV"]
-            irr_val = prob["IRR"]
-            rev_val = prob["revenues"]
-            lcoe_val = prob["LCOE"]
-            if np.isnan(npv_val) or np.isnan(irr_val) or np.isnan(rev_val):
-                import sys
-                print(f"WARNING: NaN detected in outputs - NPV={npv_val}, IRR={irr_val}, revenues={rev_val}, LCOE={lcoe_val}", file=sys.stderr)
-        except Exception as e:
-            import sys
-            print(f"ERROR checking outputs: {e}", file=sys.stderr)
 
         outputs = np.hstack(
             [

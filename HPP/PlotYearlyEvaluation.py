@@ -41,9 +41,9 @@ METRICS = [
     {"key": "irr", "title": "IRR", "ylabel": "%", "candidates": ["IRR", "IRR [%]"]},
 ]
 
-SITES_TO_PLOT = ["Sud_Atlantique_HiFiEMS","Sud_Atlantique_Solar_HiFiEMS", "Sud_Atlantique_Wind_HiFiEMS"] # For single-site triple stack
-INPUT_DIR_DEFAULT = os.path.join("HPP", "Evaluations", "HiFiEMS", "P42", "HiFiEMS") 
-OUTPUT_DIR_DEFAULT = os.path.join("HPP", "Evaluations", "HiFiEMS", "P42", "HiFiEMS", "plots")
+SITES_TO_PLOT = ["Thetys_HiFiEMS", "Thetys_Wind_HiFiEMS"] # For single-site triple stack
+INPUT_DIR_DEFAULT = os.path.join("HPP", "Evaluations", "HiFiEMS", "New") 
+OUTPUT_DIR_DEFAULT = os.path.join("HPP", "Evaluations", "HiFiEMS", "New", "plots")
 
 # ---------------------------------------------------------------------------
 # 2. SHARED HELPERS
@@ -357,7 +357,7 @@ def save_multi_site_comparison(site_list, input_dir, output_dir):
 
     plt.suptitle("Financial Performance Comparison", fontsize=16, fontweight='bold', color="#1e293b")
     
-    save_file = os.path.join(output_dir, "Financial_Comparison_Sud_Atlantique.png")
+    save_file = os.path.join(output_dir, "Financial_Comparison_Thetys.png")
     fig.savefig(save_file, dpi=300, bbox_inches='tight')
     plt.close(fig)
 
@@ -448,7 +448,7 @@ def save_multi_site_comparison_normalized(site_list, input_dir, output_dir):
 
     plt.suptitle("Normalized Performance & Volatility Comparison", fontsize=16, fontweight='bold', color="#1e293b")
     
-    save_file = os.path.join(output_dir, "Financial_Comparison_Sud_Atlantique_Normalized.png")
+    save_file = os.path.join(output_dir, "Financial_Comparison_Thetys_Normalized.png")
     fig.savefig(save_file, dpi=300, bbox_inches='tight')
     plt.close(fig)
 # ---------------------------------------------------------------------------
