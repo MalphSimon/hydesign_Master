@@ -4,12 +4,12 @@ sp [W/m2],343.0
 p_rated [MW],15.0
 Nwt,33.0
 wind_MW_per_km2 [MW/km2],5.0012
-solar_MW [MW],0.0
+solar_MW [MW],0.1
 surface_tilt [deg],0.0
 surface_azimuth [deg],180.0
 DC_AC_ratio,1.0
 b_P [MW],0.0
-b_E_h [h],3.0
+b_E_h [h],0.0
 cost_of_battery_P_fluct_in_peak_price_ratio,15.618
 name,Sud_Atlantique_Wind
 longitude,-1.7802

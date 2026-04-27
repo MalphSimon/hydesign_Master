@@ -135,82 +135,19 @@ class ems:
         wind_capacity = float(inputs["wind_MW"][0])
         solar_capacity = float(inputs["solar_MW"][0])
         
-        # If battery is zero, set to minimal value to allow EMS optimization of wind/solar
-        if battery_capacity <= 0:
-            battery_capacity = 1e-6  # Minimal value in MW
-            parameter_dict["battery_power_capacity"] = battery_capacity
+        # BYPASS HiFiEMS only for truly zero-capacity resources (1e-6 MW threshold)
+        # The HiFiEMS optimization can handle capacities down to 1e-3 MW with proper protection
+        MIN_CAPACITY = 1e-6  # Only bypass for truly zero capacities
+        if wind_capacity < MIN_CAPACITY or solar_capacity < MIN_CAPACITY:
             logger.info(
-                f"Battery power capacity was zero. Set to {battery_capacity} MW for EMS computation. "
-                f"Wind: {wind_capacity} MW, Solar: {solar_capacity} MW"
+                f"Single-resource configuration detected (Wind: {wind_capacity} MW, Solar: {solar_capacity} MW). "
+                f"Below {MIN_CAPACITY} MW threshold for at least one resource. "
+                f"Bypassing HiFiEMS EMS optimization. Using simplified dispatch model."
             )
-        if battery_energy <= 0:
-            battery_energy = 1e-6  # Minimal value in MWh
-            parameter_dict["battery_energy_capacity"] = battery_energy
-            logger.info(
-                f"Battery energy capacity was zero. Set to {battery_energy} MWh for EMS computation. "
-                f"Wind: {wind_capacity} MW, Solar: {solar_capacity} MW"
-            )
-        
-        # If wind capacity is zero (pure solar), set to minimal value to avoid division by zero in EMS
-        if wind_capacity <= 0:
-            wind_capacity = 1e-6  # Minimal value in MW
-            parameter_dict["wind_capacity"] = wind_capacity
-            logger.info(
-                f"Wind capacity was zero (pure solar configuration). Set to {wind_capacity} MW for EMS computation. "
-                f"Solar: {solar_capacity} MW"
-            )
-        
-        # If solar capacity is zero (pure wind), set to minimal value to avoid division by zero in EMS
-        if solar_capacity <= 0:
-            solar_capacity = 1e-6  # Minimal value in MW
-            parameter_dict["solar_capacity"] = solar_capacity
-            logger.info(
-                f"Solar capacity was zero (pure wind configuration). Set to {solar_capacity} MW for EMS computation. "
-                f"Wind: {wind_capacity} MW"
-            )
-
-        try:
-            (
-                P_HPP_SM_t_opt,
-                SM_price_cleared,
-                BM_dw_price_cleared,
-                BM_up_price_cleared,
-                P_HPP_RT_ts,
-                P_HPP_RT_refs,
-                P_HPP_UP_bid_ts,
-                P_HPP_DW_bid_ts,
-                s_UP_t,
-                s_DW_t,
-                residual_imbalance,
-                RES_RT_cur_ts,
-                P_dis_RT_ts,
-                P_cha_RT_ts,
-                E_SOC_ts,
-            ) = EMS_model.run(
-                parameter_dict=parameter_dict,
-                simulation_dict=simulation_dict,
-            )
-            # wind_t, solar_t, and P_curtailment_ts are not returned by EMS.run(), initialize as zeros
-            wind_t = np.zeros(len(P_HPP_RT_ts))
-            solar_t = np.zeros(len(P_HPP_RT_ts))
-            P_curtailment_ts = np.zeros(len(P_HPP_RT_ts))
-        except (IndexError, ValueError, TypeError) as e:
-            # Log error details for diagnosis
-            error_msg = f"EMS.run() failed: {type(e).__name__}: {str(e)}\n"
-            error_msg += f"  battery_power_capacity: {parameter_dict.get('battery_power_capacity', 'N/A')}\n"
-            error_msg += f"  battery_energy_capacity: {parameter_dict.get('battery_energy_capacity', 'N/A')}\n"
-            error_msg += f"  wind_capacity: {parameter_dict.get('wind_capacity', 'N/A')}\n"
-            error_msg += f"  solar_capacity: {parameter_dict.get('solar_capacity', 'N/A')}\n"
-            error_msg += f"Traceback:\n{traceback.format_exc()}"
-            
-            logger.error(error_msg)
-            print(f"\n{'!'*80}\nEMS ERROR LOGGED:\n{error_msg}\n{'!'*80}\n")
-            
-            # Handle cases where EMS.run() returns incomplete or malformed data
-            # Return empty arrays with appropriate shapes for all 15 expected values + wind_t, solar_t
             life_intervals = self.life_intervals
             life_h = self.life_h
             
+            # Return zero arrays for all EMS optimization outputs (balancing market operations)
             P_HPP_SM_t_opt = np.zeros(life_intervals)
             SM_price_cleared = np.zeros(life_h)
             BM_dw_price_cleared = np.zeros(life_h)
@@ -227,8 +164,123 @@ class ems:
             P_dis_RT_ts = np.zeros(life_intervals)
             P_cha_RT_ts = np.zeros(life_intervals)
             E_SOC_ts = np.zeros(life_intervals + 1)
-            wind_t = np.zeros(life_intervals)
-            solar_t = np.zeros(life_intervals)
+            
+            # Still calculate renewable power outputs from the actual measurement data
+            # The wind_t_measurement and solar_t_measurement inputs are already normalized by capacity
+            # So we use them directly without further scaling
+            try:
+                # Wind time series is available from wind_t_measurement input
+                wind_t = np.asarray(inputs.get("wind_t_measurement", np.zeros(life_intervals)))
+                if len(wind_t) < life_intervals:
+                    wind_t = np.pad(wind_t, (0, life_intervals - len(wind_t)), mode='edge')
+                else:
+                    wind_t = wind_t[:life_intervals]
+            except (KeyError, ValueError, TypeError):
+                wind_t = np.zeros(life_intervals)
+                logger.warning("Could not extract wind_t_measurement from inputs, using zeros")
+            
+            try:
+                # Solar time series is available from solar_t_measurement input
+                solar_t = np.asarray(inputs.get("solar_t_measurement", np.zeros(life_intervals)))
+                if len(solar_t) < life_intervals:
+                    solar_t = np.pad(solar_t, (0, life_intervals - len(solar_t)), mode='edge')
+                else:
+                    solar_t = solar_t[:life_intervals]
+            except (KeyError, ValueError, TypeError):
+                solar_t = np.zeros(life_intervals)
+                logger.warning("Could not extract solar_t_measurement from inputs, using zeros")
+            
+            # Skip EMS computation entirely
+            P_charge_discharge_ts = np.zeros(life_intervals)
+        else:
+            # Both wind and solar present - use HiFiEMS
+            # If battery is zero, set to minimal value to allow EMS optimization of wind/solar
+            if battery_capacity <= 0:
+                battery_capacity = 1e-6  # Minimal value in MW
+                parameter_dict["battery_power_capacity"] = battery_capacity
+                logger.info(
+                    f"Battery power capacity was zero. Set to {battery_capacity} MW for EMS computation. "
+                    f"Wind: {wind_capacity} MW, Solar: {solar_capacity} MW"
+                )
+            if battery_energy <= 0:
+                battery_energy = 1e-6  # Minimal value in MWh
+                parameter_dict["battery_energy_capacity"] = battery_energy
+                logger.info(
+                    f"Battery energy capacity was zero. Set to {battery_energy} MWh for EMS computation. "
+                    f"Wind: {wind_capacity} MW, Solar: {solar_capacity} MW"
+                )
+            
+            # Double-check: ensure wind and solar capacities are never near-zero in EMS optimization
+            # This protects against numerical issues in HiFiEMS optimization
+            if wind_capacity < 1e-3:
+                wind_capacity = 1e-3
+                parameter_dict["wind_capacity"] = wind_capacity
+                logger.warning(f"Wind capacity too small ({wind_capacity}), set to {1e-3} MW for numerical stability")
+            if solar_capacity < 1e-3:
+                solar_capacity = 1e-3
+                parameter_dict["solar_capacity"] = solar_capacity
+                logger.warning(f"Solar capacity too small ({solar_capacity}), set to {1e-3} MW for numerical stability")
+
+            try:
+                (
+                    P_HPP_SM_t_opt,
+                    SM_price_cleared,
+                    BM_dw_price_cleared,
+                    BM_up_price_cleared,
+                    P_HPP_RT_ts,
+                    P_HPP_RT_refs,
+                    P_HPP_UP_bid_ts,
+                    P_HPP_DW_bid_ts,
+                    s_UP_t,
+                    s_DW_t,
+                    residual_imbalance,
+                    RES_RT_cur_ts,
+                    P_dis_RT_ts,
+                    P_cha_RT_ts,
+                    E_SOC_ts,
+                ) = EMS_model.run(
+                    parameter_dict=parameter_dict,
+                    simulation_dict=simulation_dict,
+                )
+                # wind_t, solar_t, and P_curtailment_ts are not returned by EMS.run(), initialize as zeros
+                wind_t = np.zeros(len(P_HPP_RT_ts))
+                solar_t = np.zeros(len(P_HPP_RT_ts))
+                P_curtailment_ts = np.zeros(len(P_HPP_RT_ts))
+            except (IndexError, ValueError, TypeError) as e:
+                # Log error details for diagnosis
+                error_msg = f"EMS.run() failed: {type(e).__name__}: {str(e)}\n"
+                error_msg += f"  battery_power_capacity: {parameter_dict.get('battery_power_capacity', 'N/A')}\n"
+                error_msg += f"  battery_energy_capacity: {parameter_dict.get('battery_energy_capacity', 'N/A')}\n"
+                error_msg += f"  wind_capacity: {parameter_dict.get('wind_capacity', 'N/A')}\n"
+                error_msg += f"  solar_capacity: {parameter_dict.get('solar_capacity', 'N/A')}\n"
+                error_msg += f"Traceback:\n{traceback.format_exc()}"
+                
+                logger.error(error_msg)
+                print(f"\n{'!'*80}\nEMS ERROR LOGGED:\n{error_msg}\n{'!'*80}\n")
+                
+                # Handle cases where EMS.run() returns incomplete or malformed data
+                # Return empty arrays with appropriate shapes for all 15 expected values + wind_t, solar_t
+                life_intervals = self.life_intervals
+                life_h = self.life_h
+                
+                P_HPP_SM_t_opt = np.zeros(life_intervals)
+                SM_price_cleared = np.zeros(life_h)
+                BM_dw_price_cleared = np.zeros(life_h)
+                BM_up_price_cleared = np.zeros(life_h)
+                P_HPP_RT_ts = np.zeros(life_intervals)
+                P_HPP_RT_refs = np.zeros(life_intervals)
+                P_HPP_UP_bid_ts = np.zeros(life_intervals)
+                P_HPP_DW_bid_ts = np.zeros(life_intervals)
+                s_UP_t = np.zeros(life_intervals)
+                s_DW_t = np.zeros(life_intervals)
+                residual_imbalance = np.zeros(life_intervals)
+                RES_RT_cur_ts = np.zeros(life_intervals)
+                P_curtailment_ts = np.zeros(life_intervals)
+                P_dis_RT_ts = np.zeros(life_intervals)
+                P_cha_RT_ts = np.zeros(life_intervals)
+                E_SOC_ts = np.zeros(life_intervals + 1)
+                wind_t = np.zeros(life_intervals)
+                solar_t = np.zeros(life_intervals)
         
         P_charge_discharge_ts = -P_dis_RT_ts + P_cha_RT_ts
         

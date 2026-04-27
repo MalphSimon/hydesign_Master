@@ -9,7 +9,7 @@ surface_tilt [deg],0.7871000000000001
 surface_azimuth [deg],180.0
 DC_AC_ratio,1.14965
 b_P [MW],0.0
-b_E_h [h],8.0
+b_E_h [h],0.0
 cost_of_battery_P_fluct_in_peak_price_ratio,18.046000000000003
 name,NordsoenMidt
 longitude,7.5329

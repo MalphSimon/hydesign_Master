@@ -1,6 +1,7 @@
 """
 Evaluation of Hybrid Power Plants (HPPs) using HiFiEMS-specific configuration files.
 FIXED: Price adjustment now correctly modifies the market file and updates sim_pars.
+ADDED: Saving of internal EMS scripts for the first year of the evaluation range.
 """
 
 import argparse
@@ -38,7 +39,7 @@ def _load_site_design(site_name, site_config_dir):
         "clearance": float(values.loc["clearance [m]"]),
         "sp": float(values.loc["sp [W/m2]"]),
         "p_rated": float(values.loc["p_rated [MW]"]),
-        "Nwt": int(float(values.loc["Nwt"])),
+        "Nwt": float(values.loc["Nwt"]),  # Allow fractional turbines for pure solar scenarios
         "wind_MW_per_km2": float(values.loc["wind_MW_per_km2 [MW/km2]"]),
         "solar_MW": float(values.loc["solar_MW [MW]"]),
         "surface_tilt": float(values.loc["surface_tilt [deg]"]),
@@ -85,15 +86,17 @@ def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_p
         with open(sim_pars_fn, "r") as f:
             sim_pars = yaml.safe_load(f)
         
-        sim_pars['out_dir'] = os.path.abspath(year_temp_dir)
+        # Point out_dir to the provided workspace
+        # We add os.sep to ensure paths like out_dir + "revenue.csv" work correctly
+        sim_pars['out_dir'] = os.path.abspath(year_temp_dir) + os.sep
 
         # 3. Resolve Data Paths
         hifiems_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(sim_pars_fn)), "HiFiEMS_inputs"))
         suffix_map = {
-            "NordsoenMidt": "DK", "Golfe_du_Lion": "FRs", "Sud_Atlantique": "FRw", 
-            "Sud_Atlantique_Solar": "FRw", "Sud_Atlantique_Wind": "FRw",
+            "NordsoenMidt": "DKda", "Golfe_du_Lion": "FRsda", "Sud_Atlantique": "FRwda", 
+            "Sud_Atlantique_Solar": "FRwda", "Sud_Atlantique_Wind": "FRwda",
             "Thetys": "NLda", "Thetys_Solar": "NLda", "Thetys_Wind": "NLda", 
-            "SicilySouth": "IT", "Vestavind": "NO"
+            "SicilySouth": "ITda", "Vestavind": "NOda"
         }
         suffix = suffix_map.get(base_site_name, "")
         
@@ -108,23 +111,18 @@ def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_p
             with open(market_fn_orig, 'r') as f:
                 lines = f.readlines()
             
-            # Detect delimiter (market files use comma, not semicolon)
             header_line = lines[0].strip()
             delimiter = ',' if ',' in header_line else ';'
-            
-            # Identify which columns to adjust from the header
-            # Target: cleared prices (SM_cleared, BM_Up_cleared, BM_Down_cleared, reg_cleared)
-            # and forecast columns (SM_forecast, reg_forecast)
             header = header_line.split(delimiter)
+            
             target_indices = [i for i, col in enumerate(header) 
                              if 'cleared' in col.lower() or 'forecast' in col.lower()]
             
-            new_lines = [lines[0]] # Keep original header line
+            new_lines = [lines[0]] 
             for line in lines[1:]:
                 parts = line.strip().split(delimiter)
                 for idx in target_indices:
                     try:
-                        # Add the price adjustment to the numeric value
                         val = float(parts[idx])
                         parts[idx] = str(val + price_add)
                     except (ValueError, IndexError):
@@ -135,7 +133,6 @@ def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_p
                 f.writelines(new_lines)
             
             sim_pars["market_fn"] = market_fn_adj
-            print(f"Worker {year}: Surgically adjusted {len(target_indices)} price columns in Market file with delimiter '{delimiter}'.", file=sys.stderr)
         else:
             sim_pars["market_fn"] = market_fn_orig
 
@@ -144,7 +141,7 @@ def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_p
         with open(temp_yaml_fn, "w") as f_yaml:
             yaml.dump(sim_pars, f_yaml)
 
-        # 6. Prepare Input TS (Saved for model initialization)
+        # 6. Prepare Input TS
         year_input_ts_fn = os.path.join(year_temp_dir, f"input_ts_{site_name}_{year}.csv")
         year_df.to_csv(year_input_ts_fn, sep=";")
 
@@ -166,9 +163,6 @@ def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_p
             wind_t = _get_prob_var(hpp.prob, "wind_t")
             solar_t = _get_prob_var(hpp.prob, "solar_t")
             b_t = _get_prob_var(hpp.prob, "b_t")
-            
-            # Extract market prices from EMS model (hourly resolution)
-            # SM_price_cleared is the spot market cleared price (hourly)
             sm_price_cleared = _get_prob_var(hpp.prob, "SM_price_cleared")
             bm_up_price = _get_prob_var(hpp.prob, "BM_up_price_cleared")
             bm_dw_price = _get_prob_var(hpp.prob, "BM_dw_price_cleared")
@@ -186,8 +180,9 @@ def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_p
         return row, hourly_df
     
     except Exception as e:
-        # Using stderr ensures error messages are more likely to appear in the console during parallel runs
+        import traceback
         print(f"Error evaluating year {year}: {e}", file=sys.stderr)
+        print(f"Traceback:\n{traceback.format_exc()}", file=sys.stderr)
         return {"weather_year": year, "error": str(e)}, None
 
 # --- Core Execution Logic ---
@@ -209,46 +204,59 @@ def evaluate_hifiems_site(site_name, start_year, end_year, lifetime_years, price
 
     input_ts = _read_input_ts(input_ts_fn)
     yearly_groups = {year: group for year, group in input_ts.groupby(input_ts.index.year)}
+    years_to_run = sorted([y for y in range(start_year, end_year + 1) if y in yearly_groups])
 
-    years_to_run = [y for y in range(start_year, end_year + 1) if y in yearly_groups]
+    if not years_to_run:
+        print("No valid years found in the specified range.")
+        return
 
-    print(f"Starting evaluation for {site_name} (Price Add: {price_add})...")
-
-    with tempfile.TemporaryDirectory(prefix=f"hifiems_eval_{site_name}_") as temp_dir:
-        parallel_results = Parallel(n_jobs=-1, verbose=10)(
-            delayed(evaluate_single_year)(
-                year, temp_dir, site_name, base_site_name, sim_pars_fn, 
-                yearly_groups[year], design, lifetime_years, price_add, save_hourly, ex_site
-            )
-            for year in years_to_run
-        )
-
-    summary_rows = [res[0] for res in parallel_results if res[0] is not None]
-    summary_df = pd.DataFrame(summary_rows)
+    all_summary_rows = []
     
+    # --- STEP: RUN THE FIRST YEAR SEPARATELY TO SAVE DETAILED SCRIPTS ---
+    detailed_year = years_to_run[0]
+    print(f"\n--- Running Detailed Evaluation for Year: {detailed_year} ---")
+    
+    detailed_out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 
+                                    "Evaluations", "HiFiEMS", "New", "Detailed_Results", 
+                                    f"{site_name}_{detailed_year}_p{price_add}")
+    
+    # We use a permanent directory instead of a temp one for this specific year
+    row_detailed, _ = evaluate_single_year(
+        detailed_year, os.path.dirname(detailed_out_dir), site_name, base_site_name, sim_pars_fn, 
+        yearly_groups[detailed_year], design, lifetime_years, price_add, save_hourly, ex_site
+    )
+    all_summary_rows.append(row_detailed)
+    print(f"Detailed EMS scripts saved to: {detailed_out_dir}")
+
+    # --- STEP: RUN REMAINING YEARS IN PARALLEL ---
+    remaining_years = years_to_run[1:]
+    if remaining_years:
+        print(f"\n--- Running Parallel Evaluation for remaining years: {remaining_years} ---")
+        with tempfile.TemporaryDirectory(prefix=f"hifiems_eval_{site_name}_") as temp_dir:
+            parallel_results = Parallel(n_jobs=-1, verbose=10)(
+                delayed(evaluate_single_year)(
+                    year, temp_dir, site_name, base_site_name, sim_pars_fn, 
+                    yearly_groups[year], design, lifetime_years, price_add, save_hourly, ex_site
+                )
+                for year in remaining_years
+            )
+            all_summary_rows.extend([res[0] for res in parallel_results if res[0] is not None])
+
+    summary_df = pd.DataFrame(all_summary_rows)
     if output_csv:
         summary_df.to_csv(output_csv, index=False)
-        print(f"Results saved to {output_csv}")
-
-    if save_hourly:
-        hourly_list = [res[1] for res in parallel_results if res[1] is not None]
-        if hourly_list:
-            master_hourly = pd.concat(hourly_list)
-            hourly_path = output_csv.replace(".csv", "_hourly.csv")
-            master_hourly.to_csv(hourly_path, index=False)
-            print(f"Hourly production saved to {hourly_path}")
+        print(f"\nSummary results saved to {output_csv}")
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sites", default="Thetys_Solar_HiFiEMS", help="Comma-separated sites")
+    parser.add_argument("--sites", default="Sud_Atlantique_Solar_HiFiEMS", help="Comma-separated sites")
     parser.add_argument("--start-year", type=int, default=1982)
-    parser.add_argument("--end-year", type=int, default=1992)
+    parser.add_argument("--end-year", type=int, default=1985)
     parser.add_argument("--lifetime-years", type=int, default=25)
     parser.add_argument("--price-add", type=float, default=42.0)
     args = parser.parse_args()
 
     site_names = [s.strip() for s in args.sites.split(",") if s.strip()]
-    
     output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Evaluations", "HiFiEMS", "New")
     os.makedirs(output_dir, exist_ok=True)
 

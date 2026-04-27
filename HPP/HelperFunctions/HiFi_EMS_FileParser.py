@@ -2,7 +2,7 @@ import pandas as pd
 import os
 
 # --- Configuration ---
-input_file = r"C:\Users\malth\HPP\hydesign\hydesign\examples\Europe\GWA2\input_ts_Thetys_DA.csv"
+input_file = r"C:\Users\malth\HPP\hydesign\hydesign\examples\Europe\GWA2\input_ts_Siciliy_South_DA.csv"
 output_path_power = r"C:\Users\malth\HPP\hydesign\hydesign\examples\HiFiEMS_inputs\Power"
 output_path_market = r"C:\Users\malth\HPP\hydesign\hydesign\examples\HiFiEMS_inputs\Market"
 
@@ -12,7 +12,7 @@ market_cols = [
     "BM_Up_cleared", "BM_Down_cleared", "reg_cleared", "reg_forecast_1",
     "reg_forecast_2", "reg_forecast_3", "reg_vol_Up", "reg_vol_Down"
 ]
-suffix = "_NLda"
+suffix = "_ITda"
 
 os.makedirs(output_path_power, exist_ok=True)
 os.makedirs(output_path_market, exist_ok=True)

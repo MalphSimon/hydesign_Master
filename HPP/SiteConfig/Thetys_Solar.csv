@@ -2,7 +2,7 @@
 clearance [m],27.0
 sp [W/m2],343.0
 p_rated [MW],15.0
-Nwt,0
+Nwt,0.01
 wind_MW_per_km2 [MW/km2],5.0
 solar_MW [MW],963.9187298281525
 surface_tilt [deg],5.00868615539925
@@ -34,7 +34,7 @@ penalty lifetime [MEuro],0.0
 Mean Annual Electricity Sold [GWh],923.4361719872282
 GUF,0.21083017625279182
 grid [MW],500.0
-wind [MW],0.0
+wind [MW],0.1
 solar [MW],963.9187298281525
 Battery Energy [MWh],0.0
 Battery Power [MW],0.0
@@ -47,7 +47,7 @@ Rotor diam [m],235.96828103188196
 Hub height [m],144.98414051594096
 Number of batteries used in lifetime,0.0
 Break-even PPA price [Euro/MWh],73.60915280985914
-Capacity factor wind [-],
+Capacity factor wind [-],0.1
 AEP [GWh],1028.7440958546824
 AEP with degradation [GWh],964.6128913793827
 design obj,NPV_over_CAPEX

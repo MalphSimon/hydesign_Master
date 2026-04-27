@@ -80,14 +80,23 @@ class ems:
     def compute(self, **inputs):
         outputs = {}
         parameter_dict = self.parameter_dict
+        
+        wind_mw = float(inputs["wind_MW"][0])
+        solar_mw = float(inputs["solar_MW"][0])
+        
+        # Protect against division by zero for single-resource configurations
+        MIN_CAPACITY = 1e-6  # MW - effectively zero but avoids division errors
+        wind_mw = max(wind_mw, MIN_CAPACITY)
+        solar_mw = max(solar_mw, MIN_CAPACITY)
+        
         parameter_dict.update(
             {
                 # hpp parameters
                 "hpp_grid_connection": float(inputs["G_MW"][0]),  # in MW
                 # hpp wind parameters
-                "wind_capacity": float(inputs["wind_MW"][0]),  # in MW
+                "wind_capacity": wind_mw,  # in MW
                 # hpp solar parameters
-                "solar_capacity": float(inputs["solar_MW"][0]),  # in MW
+                "solar_capacity": solar_mw,  # in MW
                 # hpp battery parameters
                 "battery_energy_capacity": float(inputs["b_E"][0]),  # in MWh
                 "battery_power_capacity": float(inputs["b_P"][0]),  # in MW
@@ -98,10 +107,10 @@ class ems:
 
         Wind_data = pd.DataFrame(
             {
-                "Measurement": inputs["wind_t_measurement"] / inputs["wind_MW"],
-                "DA": inputs["wind_t_da"] / inputs["wind_MW"],
-                "HA": inputs["wind_t_ha"] / inputs["wind_MW"],
-                "RT": inputs["wind_t_rt"] / inputs["wind_MW"],
+                "Measurement": inputs["wind_t_measurement"] / wind_mw,
+                "DA": inputs["wind_t_da"] / wind_mw,
+                "HA": inputs["wind_t_ha"] / wind_mw,
+                "RT": inputs["wind_t_rt"] / wind_mw,
                 "time": pd.date_range(
                     self.simulation_dict["start_date"],
                     periods=365 * 24 * 4,
@@ -112,10 +121,10 @@ class ems:
 
         Solar_data = pd.DataFrame(
             {
-                "Measurement": inputs["solar_t_measurement"] / inputs["solar_MW"],
-                "DA": inputs["solar_t_da"] / inputs["solar_MW"],
-                "HA": inputs["solar_t_ha"] / inputs["solar_MW"],
-                "RT": inputs["solar_t_rt"] / inputs["solar_MW"],
+                "Measurement": inputs["solar_t_measurement"] / solar_mw,
+                "DA": inputs["solar_t_da"] / solar_mw,
+                "HA": inputs["solar_t_ha"] / solar_mw,
+                "RT": inputs["solar_t_rt"] / solar_mw,
                 "time": pd.date_range(
                     self.simulation_dict["start_date"],
                     periods=365 * 24 * 4,

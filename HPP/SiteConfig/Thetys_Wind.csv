@@ -4,7 +4,7 @@ sp [W/m2],343.0
 p_rated [MW],15.0
 Nwt,33.25234377730028
 wind_MW_per_km2 [MW/km2],5.0
-solar_MW [MW],0.0
+solar_MW [MW],0.1
 surface_tilt [deg],0.0
 surface_azimuth [deg],180.0
 DC_AC_ratio,1.0
@@ -35,7 +35,7 @@ Mean Annual Electricity Sold [GWh],2104.4788292879807
 GUF,0.4804746185588997
 grid [MW],500.0
 wind [MW],498.78515665950425
-solar [MW],0.0
+solar [MW],0.1
 Battery Energy [MWh],0.0
 Battery Power [MW],0.0
 Total curtailment [GWh],0.0

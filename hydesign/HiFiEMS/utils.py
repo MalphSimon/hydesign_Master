@@ -18,6 +18,12 @@ class DataReaderBase:
     def execute(self):
         T, DI_num, sim = self.T, self.DI_num, self.sim
         PwMax, PsMax = self.PwMax, self.PsMax
+        
+        # Protect against division by zero for single-resource configurations
+        # If wind or solar capacity is very small, set to a minimal operational value
+        MIN_CAPACITY = 1e-6  # MW - effectively zero but avoids division errors
+        PwMax = max(PwMax, MIN_CAPACITY)
+        PsMax = max(PsMax, MIN_CAPACITY)
 
         # Try to parse date with 4-digit year first, then fall back to 2-digit year
         try:

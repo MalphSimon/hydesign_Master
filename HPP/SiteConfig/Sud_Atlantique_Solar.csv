@@ -2,7 +2,7 @@
 clearance [m],27.0
 sp [W/m2],343.0
 p_rated [MW],15.0
-Nwt,0
+Nwt,0.01
 wind_MW_per_km2 [MW/km2],5.0
 solar_MW [MW],893.85
 surface_tilt [deg],13.210321900956929
@@ -34,7 +34,7 @@ penalty lifetime [MEuro],0.0
 Mean Annual Electricity Sold [GWh],972.972200922538
 GUF,0.22213977190012285
 grid [MW],500.0
-wind [MW],0
+wind [MW],0.1
 solar [MW],893.85
 Battery Energy [MWh],0.0
 Battery Power [MW],0.0

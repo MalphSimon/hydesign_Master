@@ -356,6 +356,11 @@ class hpp_model(hpp_base):
         # pass design variables
         p_rated_ref = self.sim_pars["p_rated_ref"]
         Nwt = int(wind_MW / p_rated_ref)
+        # Protect against division by zero: if Nwt becomes 0 due to truncation (wind_MW < p_rated_ref),
+        # set to 1 to avoid ZeroDivisionError on p_rated = wind_MW / Nwt
+        # This occurs in pure solar scenarios with minimal wind capacity
+        if Nwt <= 0:
+            Nwt = 1
         p_rated = wind_MW / Nwt
         d = self.sim_pars["d_ref"]
         hh = self.sim_pars["hh_ref"]

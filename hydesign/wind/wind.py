@@ -141,12 +141,14 @@ class genericWake_surrogate:
 
         A = get_rotor_area(d)
         sp = p_rated * 1e6 / A
-        wind_MW_per_km2 = Nwt * p_rated / (Awpp + 1e-10 * (Awpp == 0))
+        # Protect against division by zero: ensure Nwt is at least 1e-6 for numerical stability
+        Nwt_safe = max(Nwt, 1e-6)
+        wind_MW_per_km2 = Nwt_safe * p_rated / (Awpp + 1e-10 * (Awpp == 0))
 
         pcw = get_wake_affected_pc(
             genWake_fn=self.genWake_fn,
             specific_power=sp,
-            Nwt=Nwt,
+            Nwt=Nwt_safe,
             wind_MW_per_km2=wind_MW_per_km2,
             ws=ws,
             pc=pc,
