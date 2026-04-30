@@ -178,9 +178,9 @@ deviation: 500
 
 # Data
 data_dir: null
-wind_fn:  "HiFiEMS_inputs/Power/Winddata2012_Frs.csv"
-solar_fn: "HiFiEMS_inputs/Power/Solardata2012_FRs.csv"
-market_fn: "HiFiEMS_inputs/Market/Market2012_Frs.csv"
+wind_fn:  "HiFiEMS_inputs/Power/Winddata1982_Frs.csv"
+solar_fn: "HiFiEMS_inputs/Power/Solardata1982_FRs.csv"
+market_fn: "HiFiEMS_inputs/Market/Market1982_Frs.csv"
 
 ## SIMULATION KEYS
 
@@ -201,9 +201,9 @@ SP: "SM_forecast_1"  # SM_forecast;SM_cleared
 RP: "reg_forecast_1"  # reg_cleared;reg_forecast_pre
 BP: 1  # 1:forecast value 2: perfect value
 # for DDEMS (spot market) -- Historical data
-history_wind_fn: "HiFiEMS_inputs/Power/Winddata2012_Frs.csv"
-history_solar_fn: "HiFiEMS_inputs/Power/Solardata2012_Frs.csv"
-history_market_fn: "HiFiEMS_inputs/Market/Market2012_Frs.csv"
+history_wind_fn: "HiFiEMS_inputs/Power/Winddata1982_Frs.csv"
+history_solar_fn: "HiFiEMS_inputs/Power/Solardata1982_FRs.csv"
+history_market_fn: "HiFiEMS_inputs/Market/Market1982_Frs.csv"
 N_Samples: 10
 epsilon: 85  # for DRO
 epsilon1: 0.05  # for uncertainty set

@@ -1,2 +1,2 @@
-baseline_site,mean_portfolio_revenue_MEuro,std_portfolio_revenue_MEuro,delta_sigma_pct
-Sud_Atlantique_HiFiEMS,171.56076451194474,11.152307610816813,0.0
+baseline_site,mean_portfolio_revenue_MEuro,std_portfolio_revenue_MEuro,delta_sigma_pct,mean_portfolio_npv_over_capex,std_portfolio_npv_over_capex,delta_sigma_npv_capex_pct
+Sud_Atlantique_HiFiEMS,112.0954553830555,11.910386770641967,0.0,-0.2200976719042415,0.10741732255990814,1.2919506348777795e-14

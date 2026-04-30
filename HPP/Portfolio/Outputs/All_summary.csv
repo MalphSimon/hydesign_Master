@@ -1,2 +1,2 @@
-baseline_site,mean_portfolio_revenue_MEuro,std_portfolio_revenue_MEuro,delta_sigma_pct
-NordsoenMidt_HiFiEMS,988.8074821540528,56.51985499504397,-419.6105510655557
+baseline_site,mean_portfolio_revenue_MEuro,std_portfolio_revenue_MEuro,delta_sigma_pct,mean_portfolio_npv_over_capex,std_portfolio_npv_over_capex,delta_sigma_npv_capex_pct
+NordsoenMidt_HiFiEMS,643.3555722744759,54.58582490875042,-458.0059641623825,-0.152653505001438,0.09129466650424363,10.78417157045742

@@ -22,7 +22,7 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_EVAL_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "Evaluations", "HiFiEMS"))
+DEFAULT_EVAL_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "Evaluations", "HiFiEMS", "P25"))
 DEFAULT_OUTPUT_DIR = os.path.join(SCRIPT_DIR, "Outputs")
 
 PORTFOLIOS: Dict[str, Sequence[str]] = {
@@ -50,7 +50,7 @@ COLS_TO_DROP = [
 COLS_TO_AVERAGE = [
     "DC_AC_ratio", "b_E_h [h]", "LCOE [Euro/MWh]", 
     "GUF", "Break-even PPA price [Euro/MWh]", 
-    "Capacity factor wind [-]", "Capacity factor solar [-]", "DSCR Breach Years",
+    "Capacity factor wind [-]", "Capacity factor solar [-]", "DSCR Breach Years", "DSCR [-]"
 ]
 
 # ---------------------------------------------------------------------------
@@ -64,18 +64,9 @@ def _find_single_file(eval_dir: str, pattern: str) -> str:
     return matches[0]
 
 def available_sites(eval_dir: str) -> List[str]:
-    files = glob.glob(os.path.join(eval_dir, "*_hourly.csv"))
+    files = glob.glob(os.path.join(eval_dir, "*_eval_*.csv"))
     sites = sorted(set([os.path.basename(f).split("_eval_")[0] for f in files]))
     return sites
-
-def _load_hourly(site: str, eval_dir: str) -> pd.DataFrame:
-    path = _find_single_file(eval_dir, f"{site}_eval_*_hourly.csv")
-    df = pd.read_csv(path)
-    df["time"] = pd.to_datetime(df["time"], errors="coerce")
-    w_col = "wind_MW" if "wind_MW" in df.columns else "wind_t"
-    s_col = "solar_MW" if "solar_MW" in df.columns else "solar_t"
-    df["total_t"] = df[w_col] + df[s_col]
-    return df
 
 def _load_yearly(site: str, eval_dir: str) -> pd.DataFrame:
     all_matches = glob.glob(os.path.join(eval_dir, f"{site}_eval_*.csv"))
@@ -87,28 +78,6 @@ def _load_yearly(site: str, eval_dir: str) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 # Aggregation Logic
 # ---------------------------------------------------------------------------
-
-def _aggregate_hourly(sites: Sequence[str], eval_dir: str) -> pd.DataFrame:
-    portfolio_hourly = None
-    for site in sites:
-        site_df = _load_hourly(site, eval_dir)
-        w_col = "wind_MW" if "wind_MW" in site_df.columns else "wind_t"
-        s_col = "solar_MW" if "solar_MW" in site_df.columns else "solar_t"
-        
-        if portfolio_hourly is None:
-            portfolio_hourly = site_df[["time"]].copy()
-            portfolio_hourly["wind_t"] = site_df[w_col].values
-            portfolio_hourly["solar_t"] = site_df[s_col].values
-        else:
-            portfolio_hourly = portfolio_hourly.merge(
-                site_df[["time", w_col, s_col]], on="time", how="inner"
-            )
-            portfolio_hourly["wind_t"] += portfolio_hourly[w_col]
-            portfolio_hourly["solar_t"] += portfolio_hourly[s_col]
-            portfolio_hourly.drop(columns=[w_col, s_col], inplace=True)
-            
-    portfolio_hourly["total_t"] = portfolio_hourly["wind_t"] + portfolio_hourly["solar_t"]
-    return portfolio_hourly
 
 def _aggregate_yearly(sites: Sequence[str], eval_dir: str) -> pd.DataFrame:
     portfolio_df = None
@@ -171,6 +140,10 @@ def _risk_summary(portfolio_df: pd.DataFrame, sites: Sequence[str],
     baseline_yearly = _load_yearly(baseline_site, eval_dir)
     port_rev = portfolio_df["Revenues [MEuro]"].astype(float)
     base_rev = baseline_yearly["Revenues [MEuro]"].astype(float)
+    
+    # NPV/CAPEX metrics
+    port_npv_capex = portfolio_df["NPV_over_CAPEX"].astype(float) if "NPV_over_CAPEX" in portfolio_df.columns else None
+    base_npv_capex = baseline_yearly["NPV_over_CAPEX"].astype(float) if "NPV_over_CAPEX" in baseline_yearly.columns else None
 
     summary = {
         "baseline_site": baseline_site,
@@ -181,6 +154,16 @@ def _risk_summary(portfolio_df: pd.DataFrame, sites: Sequence[str],
             if base_rev.std() != 0 else 0
         )
     }
+    
+    # Add NPV/CAPEX risk metrics if available
+    if port_npv_capex is not None and base_npv_capex is not None:
+        summary["mean_portfolio_npv_over_capex"] = float(port_npv_capex.mean())
+        summary["std_portfolio_npv_over_capex"] = float(port_npv_capex.std(ddof=1))
+        summary["delta_sigma_npv_capex_pct"] = (
+            100.0 * (base_npv_capex.std() - port_npv_capex.std()) / base_npv_capex.std() 
+            if base_npv_capex.std() != 0 else 0
+        )
+    
     return pd.DataFrame([summary])
 
 def run_all_portfolios(eval_dir: str, output_dir: str, portfolios: Dict[str, Sequence[str]], baseline_site: Optional[str]):
@@ -193,11 +176,9 @@ def run_all_portfolios(eval_dir: str, output_dir: str, portfolios: Dict[str, Seq
             continue
 
         yearly = _aggregate_yearly(p_sites, eval_dir)
-        hourly = _aggregate_hourly(p_sites, eval_dir)
         summary = _risk_summary(yearly, p_sites, eval_dir, baseline_site)
         
         os.makedirs(output_dir, exist_ok=True)
-        hourly.to_csv(os.path.join(output_dir, f"{name}_hourly.csv"), index=False)
         yearly.to_csv(os.path.join(output_dir, f"{name}_yearly.csv"), index=False)
         summary.to_csv(os.path.join(output_dir, f"{name}_summary.csv"), index=False)
         print(f"  [OK] Saved {name} outputs to {output_dir}")

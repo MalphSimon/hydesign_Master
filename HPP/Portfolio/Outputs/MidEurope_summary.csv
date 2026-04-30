@@ -1,2 +1,2 @@
-baseline_site,mean_portfolio_revenue_MEuro,std_portfolio_revenue_MEuro,delta_sigma_pct
-Thetys_HiFiEMS,508.655954387297,31.914352049106032,-292.71003078023034
+baseline_site,mean_portfolio_revenue_MEuro,std_portfolio_revenue_MEuro,delta_sigma_pct,mean_portfolio_npv_over_capex,std_portfolio_npv_over_capex,delta_sigma_npv_capex_pct
+Thetys_HiFiEMS,335.2556524578827,31.580356693690852,-332.41320545909633,-0.14943278281011815,0.10163670912949986,-43.891871802932236
