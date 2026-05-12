@@ -17,8 +17,9 @@ import seaborn as sns
 SITE_DISPLAY_MAP = {
     "Sud_Atlantique": "Sud Atlantique",
     "MidEurope": "Mid-Europe",
-    "NorthSouth": "North-South",
+    "NorthSouth": "North-South Europe",
     "All": "All Sites",
+    "Best": "Best Sites",
 }
 
 UNIFORM_COLOR = "#9C7667"
@@ -34,6 +35,7 @@ SITES_TO_PLOT = [
     "MidEurope",
     "NorthSouth",
     "All",
+    "Best",
         
 ]
 
@@ -69,7 +71,8 @@ def _get_npv_column(df):
 def save_single_site_triple_stack(csv_path, output_dir):
     df = pd.read_csv(csv_path)
     fname = os.path.basename(csv_path)
-    site_id = fname.split("_eval_")[0]
+    # Extract site_id from filename by removing yearly/hourly/eval patterns and extension
+    site_id = fname.split("_yearly")[0].split("_hourly")[0].split("_eval_")[0]
     
     display_name = SITE_DISPLAY_MAP.get(site_id, site_id)
     x, labels = _prepare_year_axis(df)
@@ -87,9 +90,8 @@ def save_single_site_triple_stack(csv_path, output_dir):
             std_val = y_plot.std()
             
             if cfg['key'] == 'npv':
-                cv_val = (std_val / abs(mean_val)) if abs(mean_val) > 1e-6 else 0
-                label_str = f"Mean: {mean_val:.2f} {cfg['ylabel']}\nCV: {cv_val:.2f}"
-                site_stats["NPV CV"] = cv_val
+                label_str = f"Mean: {mean_val:.2f} {cfg['ylabel']}\nStd: {std_val:.2f}"
+                site_stats["NPV Std Dev"] = std_val
                 site_stats["Mean NPV"] = mean_val
             else:
                 label_str = f"Mean: {mean_val:.2f} {cfg['ylabel']}"
@@ -121,7 +123,7 @@ def save_npv_distribution_boxplot(all_site_data_frames, output_dir):
         sns.boxplot(data=combined_df, x='site_display', y=npv_col, palette='viridis', width=0.6)
         sns.stripplot(data=combined_df, x='site_display', y=npv_col, color='black', size=3, jitter=0.2, alpha=0.3)
         plt.xticks(rotation=45, ha='right')
-        plt.xlabel("Site Location", fontweight='bold')
+        plt.xlabel("Portfolio", fontweight='bold')
         plt.ylabel("NPV (M EUR)", fontweight='bold')
         plt.title("NPV Distribution Across Weather Years", fontsize=16, fontweight='bold')
         plt.axhline(0, color='red', lw=1.5, ls='--')
@@ -139,7 +141,7 @@ def save_npv_capex_distribution_boxplot(all_site_data_frames, output_dir):
     sns.stripplot(data=combined_df, x='site_display', y=target_col, color='black', size=4, jitter=0.15, alpha=0.3)
     ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0 if combined_df[target_col].max() < 2 else 100.0))
     plt.xticks(rotation=45, ha='right', fontsize=10)
-    plt.xlabel("Site Location", fontweight='bold')
+    plt.xlabel("Portfolio", fontweight='bold')
     plt.ylabel("NPV / CAPEX [%]", fontweight='bold')
     plt.title("Distribution of NPV/CAPEX Across Scenario Years", fontsize=14, fontweight='bold')
     plt.axhline(0, color='red', lw=1.2, ls='--', alpha=0.6)
@@ -153,11 +155,12 @@ def save_dscr_distribution_boxplot(all_site_data_frames, output_dir):
 
     plt.figure(figsize=(12, 7))
     site_colors_6 = ["#43D1D9", "#4B86C2", "#9C7667", "#68A357", "#D4A373", "#B07BA1"]
+    # site_display is already set with correct display names from SITE_DISPLAY_MAP
     ax = sns.boxplot(data=combined_df, x='site_display', y=target_col, palette=site_colors_6, width=0.5, fliersize=0)
     sns.stripplot(data=combined_df, x='site_display', y=target_col, color='black', size=4, jitter=0.15, alpha=0.3)
     plt.xticks(rotation=45, ha='right', fontsize=10)
-    plt.xlabel("Site Location", fontweight='bold')
-    plt.ylabel("DSCR [-]", fontweight='bold')
+    plt.xlabel("Portfolio", fontweight='bold')
+    plt.ylabel("DSCR", fontweight='bold')
     plt.title("Distribution of DSCR Across Scenario Years", fontsize=14, fontweight='bold')
     plt.axhline(1.20, color='red', lw=1.2, ls='--', alpha=0.6, label='Target DSCR (1.20)')
     plt.legend(loc='upper right', frameon=True)
@@ -192,8 +195,7 @@ def save_multi_site_comparison(site_list, input_dir, output_dir):
                 std_val = y_plot.std()
                 
                 if cfg['key'] == 'npv':
-                    cv_val = (std_val / abs(mean_val)) if abs(mean_val) > 1e-6 else 0
-                    label_str = f"Mean: {mean_val:.1f} {cfg['ylabel']}\nCV: {cv_val:.1f}"
+                    label_str = f"Mean: {mean_val:.1f} {cfg['ylabel']}\nStd: {std_val:.1f}"
                 else:
                     label_str = f"Mean: {mean_val:.2f} {cfg['ylabel']}"
                 
@@ -209,7 +211,7 @@ def save_multi_site_comparison(site_list, input_dir, output_dir):
     axes[2].set_xticks(x)
     axes[2].set_xticklabels([f"{int(v) % 100:02d}" if pd.notna(v) else "" for v in pd.to_numeric(labels, errors="coerce")])
     axes[2].set_xlabel("Scenario Year", fontweight='bold', fontsize=12)
-    fig.legend(handles=site_legend_handles, loc='lower center', ncol=4, bbox_to_anchor=(0.5, 0.01))
+    fig.legend(handles=site_legend_handles, loc='lower center', ncol=5, bbox_to_anchor=(0.5, 0.01))
     plt.suptitle("Financial Performance Comparison", fontsize=16, fontweight='bold', y=0.92)
     plt.savefig(os.path.join(output_dir, "Financial_Comparison_Portfolio.png"), dpi=300, bbox_inches='tight')
     plt.close()
@@ -253,7 +255,7 @@ def save_multi_site_dscr_yearly(site_list, input_dir, output_dir):
     ax.add_artist(leg1)
     
     # Create site legend at bottom center
-    ax.legend(handles=site_legend_handles, loc='lower center', ncol=4, bbox_to_anchor=(0.5, -0.15), frameon=True, fontsize=10)
+    ax.legend(handles=site_legend_handles, loc='lower center', ncol=5, bbox_to_anchor=(0.5, -0.15), frameon=True, fontsize=10)
     
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "DSCR_Yearly_Comparison_Portfolio.png"), dpi=300, bbox_inches='tight')

@@ -1,5 +1,6 @@
-,Vestavind (NO),Nordsøen Midt (DK),Thetys HPP (NL),Sud Atlantique HPP (FRw),Golfe du Lion (FRs),Sicily South (IT)
-DSCR [-] (P90),1.0,1.4,1.1,1.0,1.2,0.8
+,Vestavind (NO),Nordsøen Midt (DK),Thetys (NL),Sud Atlantique (FRw),Golfe du Lion (FRs),Sicily South (IT)
+DSCR [-] (P90),1.04,1.4,1.15,0.98,1.15,0.82
+DSCR (Min),0.97,1.37,1.13,0.92,1.06,0.76
 DSCR Breach Years (P90),0.0,0.0,0.0,0.0,0.0,7.5
-Debt Headroom [MEuro] (P90),-110.0,139.6,-39.6,-182.4,-34.3,-272.4
-Debt Headroom [% of CAPEX] (P90),-9.3,11.8,-3.0,-13.0,-2.9,-22.2
+Debt Headroom [MEuro] (P90),-109.99,139.58,-39.58,-182.35,-34.27,-272.44
+Debt Headroom [% of CAPEX] (P90),-9.28,11.77,-3.05,-13.03,-2.88,-22.22

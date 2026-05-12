@@ -72,7 +72,7 @@ def _read_input_ts(input_ts_fn):
 # --- Worker Function (Isolated) ---
 
 def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_pars_fn, 
-                        year_df, design, lifetime_years, price_add, save_hourly, ex_site):
+                        year_df, design, lifetime_years, price_add, save_hourly, ex_site, examples_filepath=None):
     try:
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         if repo_root not in sys.path:
@@ -91,12 +91,15 @@ def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_p
         sim_pars['out_dir'] = os.path.abspath(year_temp_dir) + os.sep
 
         # 3. Resolve Data Paths
-        hifiems_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(sim_pars_fn)), "HiFiEMS_inputs"))
+        if examples_filepath is None:
+            hifiems_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(sim_pars_fn)), "HiFiEMS_inputs"))
+        else:
+            hifiems_dir = os.path.abspath(os.path.join(examples_filepath.rstrip("/").rstrip("\\"), "HiFiEMS_inputs"))
         suffix_map = {
-            "NordsoenMidt": "DKda", "Golfe_du_Lion": "FRsda", "Sud_Atlantique": "FRwda", 
+            "NordsoenMidt": "DKdaOffshore", "Golfe_du_Lion": "FRsdaOffshore", "Sud_Atlantique": "FRwdaOffshore", 
             "Sud_Atlantique_Solar": "FRwda", "Sud_Atlantique_Wind": "FRwda",
-            "Thetys": "NLda", "Thetys_Solar": "NLda", "Thetys_Wind": "NLda", 
-            "SicilySouth": "ITda", "Vestavind": "NOda"
+            "Thetys": "NLdaOffshore", "Thetys_Solar": "NLda", "Thetys_Wind": "NLdaOffshore", 
+            "SicilySouth": "ITdaOffshore", "Vestavind": "NOdaOffshore"
         }
         suffix = suffix_map.get(base_site_name, "")
         
@@ -105,7 +108,7 @@ def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_p
         market_fn_orig = os.path.join(hifiems_dir, f"Market/Market{year}_{suffix}.csv")
 
         # 4. Handle Price Adjustment
-        if price_add != 0:
+        if price_add != 0 and price_add != 1.0:
             market_fn_adj = os.path.join(year_temp_dir, f"Market{year}_adj.csv")
             with open(market_fn_orig, 'r') as f:
                 lines = f.readlines()
@@ -121,7 +124,15 @@ def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_p
                 for idx in target_indices:
                     try:
                         val = float(parts[idx])
-                        parts[idx] = str(val + price_add)
+                        # Determine if price_add is multiplicative or additive based on magnitude
+                        # Multipliers from sensitivity: 0.8-2.5 (treated as multipliers)
+                        # Absolute values from CLI: typically > 5 (treated as additive in euros)
+                        if 0.5 <= price_add <= 2.5:
+                            # Multiplicative scaling (from sensitivity analysis)
+                            parts[idx] = str(val * price_add)
+                        else:
+                            # Additive adjustment (from regular evaluation)
+                            parts[idx] = str(val + price_add)
                     except (ValueError, IndexError):
                         continue
                 new_lines.append(delimiter.join(parts) + '\n')
@@ -282,11 +293,11 @@ def evaluate_hifiems_site(site_name, start_year, end_year, lifetime_years, price
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sites", default="SicilySouth_HiFiEMS", help="Comma-separated sites")
+    parser.add_argument("--sites", default="Golfe_du_Lion_HiFiEMS, NordsoenMidt_HiFiEMS, SicilySouth_HiFiEMS, Vestavind_HiFiEMS", help="Comma-separated sites")
     parser.add_argument("--start-year", type=int, default=1982)
     parser.add_argument("--end-year", type=int, default=2015)
     parser.add_argument("--lifetime-years", type=int, default=25)
-    parser.add_argument("--price-add", type=float, default=25.0)
+    parser.add_argument("--price-add", type=float, default=25)
     args = parser.parse_args()
 
     site_names = [s.strip() for s in args.sites.split(",") if s.strip()]
@@ -294,7 +305,7 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     for site in site_names:
-        csv_path = os.path.join(output_dir, f"{site}_eval_{args.start_year}_{args.end_year}_p{args.price_add}.csv")
+        csv_path = os.path.join(output_dir, f"{site}_eval_{args.start_year}_{args.end_year}_p{args.price_add}_Offshore.csv")
         evaluate_hifiems_site(site, args.start_year, args.end_year, args.lifetime_years, args.price_add, csv_path)
 
 if __name__ == "__main__":

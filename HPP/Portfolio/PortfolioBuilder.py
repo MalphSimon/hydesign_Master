@@ -28,7 +28,8 @@ DEFAULT_OUTPUT_DIR = os.path.join(SCRIPT_DIR, "Outputs")
 PORTFOLIOS: Dict[str, Sequence[str]] = {
     "Sud_Atlantique": ["Sud_Atlantique_HiFiEMS"],
     "MidEurope": ["Thetys_HiFiEMS", "Sud_Atlantique_HiFiEMS", "Golfe_du_Lion_HiFiEMS"],
-    "NorthSouth": ["NordsoenMidt_HiFiEMS", "Sud_Atlantique_HiFiEMS", "SicilySouth_HiFiEMS"],
+    "NorthSouth": ["Vestavind_HiFiEMS", "Sud_Atlantique_HiFiEMS", "SicilySouth_HiFiEMS"],
+    "Best": ["NordsoenMidt_HiFiEMS", "Golfe_du_Lion_HiFiEMS"],
     "All": [
         "NordsoenMidt_HiFiEMS", "Golfe_du_Lion_HiFiEMS", "SicilySouth_HiFiEMS", 
         "Thetys_HiFiEMS", "Sud_Atlantique_HiFiEMS", "Vestavind_HiFiEMS"

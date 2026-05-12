@@ -85,7 +85,6 @@ def main():
     print(display_df.to_string())
     print("=" * 140)
     print("\nNote: CV = Coefficient of Variation (std / |mean|)")
-    print("NPV/CAPEX CV indicates the volatility of returns relative to invested capital.")
-
+    
 if __name__ == "__main__":
     main()

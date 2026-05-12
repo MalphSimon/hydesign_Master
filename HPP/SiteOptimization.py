@@ -17,7 +17,7 @@ if repo_root not in sys.path:
     sys.path.insert(0, repo_root)
 
 import pandas as pd
-from hydesign.assembly.hpp_assembly_sp import hpp_model
+from hydesign.assembly.hpp_assembly_hifi import hpp_model
 from hydesign.Parallel_EGO import EfficientGlobalOptimizationDriver
 from hydesign.examples import examples_filepath
 
@@ -72,8 +72,9 @@ OPT_VARIABLES = {
         'types': 'float'
     },
     'solar_MW [MW]': {
-        'var_type': 'fixed',
-        'value': 0
+        'var_type': 'design',
+        'limits': [0, 600],
+        'types': 'float'
     },
     'surface_tilt [deg]': {
         'var_type': 'design',
@@ -90,12 +91,14 @@ OPT_VARIABLES = {
         'types': 'float'
     },
     'b_P [MW]': {
-        'var_type': 'fixed',
-        'value':0
+        'var_type': 'design',
+        'limits': [0, 100],
+        'types': 'float'
     },
     'b_E_h [h]': {
-        'var_type': 'fixed',
-        'value': 0
+        'var_type': 'design',
+        'limits': [0, 10],
+        'types': 'float'
     },
     'cost_of_battery_P_fluct_in_peak_price_ratio': {
         'var_type': 'design',
@@ -243,7 +246,7 @@ def _run_one_site(ex_site, price_increment=0.0):
 def main():
     """Main entry point for optimization CLI."""
     parser = argparse.ArgumentParser(description='Run HPP site optimization.')
-    parser.add_argument('--site', default='Sud_Atalantique_Wind_HiFiEMS', 
+    parser.add_argument('--site', default='Sud_Atlantique_HiFiEMS', 
                         help="Site name, row index, or 'all'.")
     parser.add_argument('--list-sites', action='store_true', help='List available sites and exit')
     parser.add_argument('--price-increment', type=float, default=0.0, 

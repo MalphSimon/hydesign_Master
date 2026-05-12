@@ -21,15 +21,22 @@ SITE_DISPLAY_MAP = {
     "Thetys": "Thetys (NL)",
     "NordsoenMidt": "Nordsøen Midt (DK)",
     "Vestavind": "Vestavind (NO)",
-    "SicilySouth_HiFiEMS": "Sicily South (IT)",
+    "SicilySouth_HiFiEMS": "Sicily South HiFiEMS (IT)",
+    "SicilySouthNorm_HiFiEMS": "Sicily South EMS (IT)",
     "Golfe_du_Lion_HiFiEMS": "Golfe du Lion (FRs)",
-    "Sud_Atlantique_HiFiEMS": "Sud Atlantique HPP (FRw)",
+    "Sud_Atlantique_HiFiEMS": "Sud Atlantique Onshore PV (FRw)",
+    "Sud_AtlantiqueNorm_HiFiEMS": "Sud Atlantique EMS (FRw)",
+    "Sud_Atlantique_Offshore_HiFiEMS": "Sud Atlantique Offshore PV (FRw)",
+    "Sud_Atlantique_HiFiEMS_2045": "Sud Atlantique 2045 CAPEX (FRw)",
     "Sud_Atlantique_Solar_HiFiEMS": "Sud Atlantique Solar (FRw)",
     "Sud_Atlantique_Wind_HiFiEMS": "Sud Atlantique Wind (FRw)",
-    "Thetys_HiFiEMS": "Thetys HPP (NL)",
+    "Thetys_HiFiEMS": "Thetys Onshore PV (NL)",
+    "Thetys_Offshore_HiFiEMS": "Thetys Offshore PV (NL)",
+    "ThetysNorm_HiFiEMS": "Thetys EMS (NL)",
     "Thetys_Solar_HiFiEMS": "Thetys Solar (NL)",
     "Thetys_Wind_HiFiEMS": "Thetys Wind (NL)",
-    "NordsoenMidt_HiFiEMS": "Nordsøen Midt (DK)",
+    "NordsoenMidt_HiFiEMS": "Nordsøen Midt HiFiEMS (DK)",
+    "NordsoenMidtNorm_HiFiEMS": "Nordsøen Midt EMS (DK)",
     "Vestavind_HiFiEMS": "Vestavind (NO)",
 }
 
@@ -42,10 +49,7 @@ METRICS = [
 ]
 
 SITES_TO_PLOT = [
-    "Sud_Atlantique_HiFiEMS",
-    "Sud_Atlantique_Wind_HiFiEMS",
-    "Sud_Atlantique_Solar_HiFiEMS",
-        
+    "Thetys_HiFiEMS", "Thetys_Offshore_HiFiEMS"
 ]
 
 INPUT_DIR_DEFAULT = os.path.join("HPP", "Evaluations", "HiFiEMS", "P25") 
@@ -98,9 +102,8 @@ def save_single_site_triple_stack(csv_path, output_dir):
             std_val = y_plot.std()
             
             if cfg['key'] == 'npv':
-                cv_val = (std_val / abs(mean_val)) if abs(mean_val) > 1e-6 else 0
-                label_str = f"Mean: {mean_val:.2f} {cfg['ylabel']}\nCV: {cv_val:.2f}"
-                site_stats["NPV CV"] = cv_val
+                label_str = f"Mean: {mean_val:.2f} {cfg['ylabel']}\nStd: {std_val:.2f}"
+                site_stats["NPV Std Dev"] = std_val
                 site_stats["Mean NPV"] = mean_val
             else:
                 label_str = f"Mean: {mean_val:.2f} {cfg['ylabel']}"
@@ -136,7 +139,7 @@ def save_npv_distribution_boxplot(all_site_data_frames, output_dir):
         plt.ylabel("NPV (M EUR)", fontweight='bold')
         plt.title("NPV Distribution Across Weather Years", fontsize=16, fontweight='bold')
         plt.axhline(0, color='red', lw=1.5, ls='--')
-        plt.savefig(os.path.join(output_dir, "NPV_Volatility_Distribution_Boxplot_Sud_Atlantique.png"), dpi=200, bbox_inches='tight')
+        plt.savefig(os.path.join(output_dir, "NPV_Volatility_Distribution_Boxplot_Thetys_PV.png"), dpi=200, bbox_inches='tight')
     plt.close()
 
 def save_npv_capex_distribution_boxplot(all_site_data_frames, output_dir):
@@ -154,7 +157,7 @@ def save_npv_capex_distribution_boxplot(all_site_data_frames, output_dir):
     plt.ylabel("NPV / CAPEX [%]", fontweight='bold')
     plt.title("Distribution of NPV/CAPEX Across Scenario Years", fontsize=14, fontweight='bold')
     plt.axhline(0, color='red', lw=1.2, ls='--', alpha=0.6)
-    plt.savefig(os.path.join(output_dir, "NPV_CAPEX_Boxplot_Percentage_Sud_Atlantique.png"), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(output_dir, "NPV_CAPEX_Boxplot_Percentage_Thetys_PV.png"), dpi=300, bbox_inches='tight')
     plt.close()
 
 def save_dscr_distribution_boxplot(all_site_data_frames, output_dir):
@@ -172,12 +175,12 @@ def save_dscr_distribution_boxplot(all_site_data_frames, output_dir):
     plt.title("Distribution of DSCR Across Scenario Years", fontsize=14, fontweight='bold')
     plt.axhline(1.20, color='red', lw=1.2, ls='--', alpha=0.6, label='Target DSCR (1.20)')
     plt.legend(loc='upper right', frameon=True)
-    plt.savefig(os.path.join(output_dir, "DSCR_Distribution_Boxplot.png"), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(output_dir, "DSCR_Distribution_Boxplot_Thetys_PV.png"), dpi=300, bbox_inches='tight')
     plt.close()
 
 def save_multi_site_comparison(site_list, input_dir, output_dir):
     fig, axes = plt.subplots(3, 1, figsize=(15, 10), sharex=True)
-    site_colors = ["#43D1D9", "#4B86C2", "#9C7667", "#68A357", "#D4A373", "#B07BA1"]
+    site_colors = ["#43D1D9", "#9C7667", "#4B86C2", "#68A357", "#D4A373", "#B07BA1"]
     site_legend_handles = []
 
     for idx, site_key in enumerate(site_list):
@@ -203,8 +206,7 @@ def save_multi_site_comparison(site_list, input_dir, output_dir):
                 std_val = y_plot.std()
                 
                 if cfg['key'] == 'npv':
-                    cv_val = (std_val / abs(mean_val)) if abs(mean_val) > 1e-6 else 0
-                    label_str = f"Mean: {mean_val:.1f} {cfg['ylabel']}\nCV: {cv_val:.1f}"
+                    label_str = f"Mean: {mean_val:.1f} {cfg['ylabel']}\nStd: {std_val:.1f}"
                 else:
                     label_str = f"Mean: {mean_val:.2f} {cfg['ylabel']}"
                 
@@ -222,12 +224,12 @@ def save_multi_site_comparison(site_list, input_dir, output_dir):
     axes[2].set_xlabel("Scenario Year", fontweight='bold', fontsize=12)
     fig.legend(handles=site_legend_handles, loc='lower center', ncol=3, bbox_to_anchor=(0.5, 0.01))
     plt.suptitle("Financial Performance Comparison", fontsize=16, fontweight='bold', y=0.92)
-    plt.savefig(os.path.join(output_dir, "Financial_Comparison_Sud_Atlantique.png"), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(output_dir, "Financial_Comparison_Thetys_PV.png"), dpi=300, bbox_inches='tight')
     plt.close()
 
 def save_multi_site_dscr_yearly(site_list, input_dir, output_dir):
     fig, ax = plt.subplots(figsize=(15, 8))
-    site_colors = ["#43D1D9", "#4B86C2", "#9C7667", "#68A357", "#D4A373", "#B07BA1"]
+    site_colors = ["#43D1D9", "#9C7667", "#4B86C2", "#68A357", "#D4A373", "#B07BA1"]
     site_legend_handles = []
     mean_legend_handles = []
 
@@ -267,7 +269,7 @@ def save_multi_site_dscr_yearly(site_list, input_dir, output_dir):
     ax.legend(handles=site_legend_handles, loc='lower center', ncol=3, bbox_to_anchor=(0.5, -0.15), frameon=True, fontsize=10)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, "DSCR_Yearly_Comparison_Sud_Atlantique.png"), dpi=300, bbox_inches='tight')
+    plt.savefig(os.path.join(output_dir, "DSCR_Yearly_Comparison_Thetys_PV.png"), dpi=300, bbox_inches='tight')
     plt.close()
 
 def save_bankability_metrics_table(site_list, input_dir, output_dir):
@@ -294,6 +296,11 @@ def save_bankability_metrics_table(site_list, input_dir, output_dir):
                 if col == "Debt Headroom [% of CAPEX]":
                     data = data * 100
                 row[f"{col} (Mean)"] = data.mean()
+
+                # Add minimum DSCR rightafter mean
+                if col == "DSCR [-]":
+                    row["DSCR (Min)"] = data.min()
+
         
         results.append(row)
     
@@ -304,7 +311,7 @@ def save_bankability_metrics_table(site_list, input_dir, output_dir):
     summary_df = summary_df.set_index("Site").T
     
     # Format all values to 1 decimal place
-    summary_df = summary_df.round(1)
+    summary_df = summary_df.round(2)
     
     # Print to terminal with nice formatting
     print("\n" + "="*120)
@@ -340,6 +347,10 @@ def save_bankability_metrics_table_p90(site_list, input_dir, output_dir):
                 if col == "Debt Headroom [% of CAPEX]":
                     data = data * 100
                 row[f"{col} (P90)"] = np.percentile(data.dropna(), 10)
+
+                # Add minimum DSCR rightafter mean
+                if col == "DSCR [-]":
+                    row["DSCR (Min)"] = data.min()
         
         results.append(row)
     
@@ -350,7 +361,7 @@ def save_bankability_metrics_table_p90(site_list, input_dir, output_dir):
     summary_df = summary_df.set_index("Site").T
     
     # Format all values to 1 decimal place
-    summary_df = summary_df.round(1)
+    summary_df = summary_df.round(2)
     
     # Print to terminal with nice formatting
     print("\n" + "="*120)
@@ -504,12 +515,12 @@ def main():
         
         print(f"[Visualizing] Risk-Return and Distributions...")
         #save_npv_distribution_boxplot(processed_dataframes, args.output_dir)
-        #save_npv_capex_distribution_boxplot(processed_dataframes, args.output_dir)
+        save_npv_capex_distribution_boxplot(processed_dataframes, args.output_dir)
         #save_dscr_distribution_boxplot(processed_dataframes, args.output_dir)
         save_multi_site_dscr_yearly(SITES_TO_PLOT, args.input_dir, args.output_dir)
-        #save_bankability_metrics_table(SITES_TO_PLOT, args.input_dir, args.output_dir)
+        save_bankability_metrics_table(SITES_TO_PLOT, args.input_dir, args.output_dir)
         #save_bankability_metrics_table_p90(SITES_TO_PLOT, args.input_dir, args.output_dir)
-        #save_financial_metrics_table(SITES_TO_PLOT, args.input_dir, args.output_dir)
+        save_financial_metrics_table(SITES_TO_PLOT, args.input_dir, args.output_dir)
         #save_financial_metrics_table_p90(SITES_TO_PLOT, args.input_dir, args.output_dir)
         save_multi_site_comparison(SITES_TO_PLOT, args.input_dir, args.output_dir)
 

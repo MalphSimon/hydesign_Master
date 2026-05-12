@@ -528,16 +528,16 @@ def main():
     _init_local_hydesign_imports()
 
     # --- CONFIGURATION ---
-    DEFAULT_PRICE_ADD = 30
+    DEFAULT_PRICE_ADD = 25
     # ---------------------
 
     parser = argparse.ArgumentParser(description="Evaluate site designs across multiple weather years.")
-    parser.add_argument("--site", nargs='+', default=["Golfe_du_Lion"], 
+    parser.add_argument("--site", nargs='+', default=["SicilySouth"], 
                         help="List of site names to process.")
     parser.add_argument("--list-sites", action="store_true", help="Show all available site configs and exit.")
     parser.add_argument("--start-year", type=int, default=1982)
-    parser.add_argument("--end-year", type=int, default=1982)
-    parser.add_argument("--lifetime-years", type=int, default=1)
+    parser.add_argument("--end-year", type=int, default=2015)
+    parser.add_argument("--lifetime-years", type=int, default=25)
     parser.add_argument("--output-csv", default=None, help="Custom output path for results.")
     parser.add_argument("--price-add", type=float, default=DEFAULT_PRICE_ADD, 
                         help=f"Price offset in Eur/MWh (Default: {DEFAULT_PRICE_ADD})")

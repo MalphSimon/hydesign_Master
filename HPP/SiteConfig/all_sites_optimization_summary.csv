@@ -1,2 +1,2 @@
-name,site_config_file,NPV_over_CAPEX,NPV [MEuro],LCOE [Euro/MWh],wind [MW],solar [MW],status
-Thetys_Wind_HiFiEMS,c:\Users\malth\HPP\hydesign\HPP\SiteConfig\Thetys_Wind_HiFiEMS.csv,-0.7546414788671761,-898.8942203449918,58.747098152233676,498.78515665950425,0.0,ok
+name,status,error
+Sud_Atlantique_HiFiEMS,failed,All simulations failed during initial DOE. Try narrowing variable bounds or checking model inputs.

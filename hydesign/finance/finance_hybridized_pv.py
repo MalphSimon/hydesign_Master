@@ -600,8 +600,12 @@ def calculate_NPV_IRR(
         plt.show()
 
     NPV = npf.npv(discount_rate, Cashflow)
-    if NPV > 0:
+    
+    # Calculate IRR regardless of NPV sign
+    try:
         IRR = npf.irr(Cashflow)
-    else:
-        IRR = 0
+        if pd.isna(IRR) or np.isnan(IRR):
+            IRR = np.nan
+    except (ValueError, RuntimeWarning):
+        IRR = np.nan
     return NPV, IRR
