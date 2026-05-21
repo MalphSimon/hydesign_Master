@@ -9,7 +9,7 @@ DEFAULT_BANKABILITY_ASSUMPTIONS = {
     "debt_interest_rate": 0.06,
     "debt_tenor_years": 25,
     "target_min_dscr": 1.20,
-    "cfads_degradation_rate": None,
+    "cfads_degradation_rate": 0.0,  # Degradation already in revenues from wind/solar models
     "llcr_discount_rate": None,
 }
 
@@ -59,7 +59,7 @@ def _npv_of_series(values, discount_rate):
     return float(np.nansum(values / discounts))
 
 
-def calculate_bankability_metrics(row, assumptions=None):
+def calculate_bankability_metrics(row, assumptions=None, yearly_revenues=None):
     """Calculate DSCR/LLCR-style metrics from a yearly evaluation row.
 
     Parameters
@@ -68,6 +68,10 @@ def calculate_bankability_metrics(row, assumptions=None):
         Row containing at least CAPEX, revenues and OPEX values.
     assumptions : dict, optional
         Optional overrides for debt assumptions.
+    yearly_revenues : array-like, optional
+        If provided, yearly revenues across the lifetime (25 years).
+        Allows calculation of DSCR variation across years.
+        If not provided, assumes constant annual revenue.
 
     Returns
     -------
@@ -106,21 +110,40 @@ def calculate_bankability_metrics(row, assumptions=None):
         annual_debt_service = np.nan
 
     if pd.notna(annual_debt_service) and annual_debt_service > 0:
-        if pd.notna(cfads) and debt_tenor_years > 0:
+        # If yearly revenues are provided, use them for DSCR calculation
+        if yearly_revenues is not None and len(yearly_revenues) > 0:
+            yearly_revenues = np.asarray(yearly_revenues, dtype=float)
+            yearly_opex = opex if pd.notna(opex) else 0.0
+            yearly_cfads = yearly_revenues - yearly_opex
+            dscr_series = yearly_cfads / annual_debt_service
+            dscr = float(np.nanmin(dscr_series))
+            dscr_avg = float(np.nanmean(dscr_series))
+            dscr_p90 = float(np.nanpercentile(dscr_series, 10))
+        # Otherwise, use degradation-based calculation
+        elif pd.notna(cfads) and debt_tenor_years > 0:
             cfads_series = cfads * (1.0 - cfads_degradation_rate) ** np.arange(
                 debt_tenor_years
             )
             dscr_series = cfads_series / annual_debt_service
             dscr = float(np.nanmin(dscr_series))
             dscr_avg = float(np.nanmean(dscr_series))
+            dscr_p90 = float(np.nanpercentile(dscr_series, 10))
         else:
             dscr = np.nan
             dscr_avg = np.nan
+            dscr_p90 = np.nan
     else:
         dscr = np.nan
         dscr_avg = np.nan
+        dscr_p90 = np.nan
 
-    if pd.notna(cfads) and debt_tenor_years > 0:
+    # LLCR calculation (use yearly if available, otherwise degradation-based)
+    if yearly_revenues is not None and len(yearly_revenues) > 0:
+        yearly_revenues_arr = np.asarray(yearly_revenues, dtype=float)
+        yearly_opex = opex if pd.notna(opex) else 0.0
+        yearly_cfads = yearly_revenues_arr - yearly_opex
+        pv_cfads = _npv_of_series(yearly_cfads, llcr_discount_rate)
+    elif pd.notna(cfads) and debt_tenor_years > 0:
         cfads_series = cfads * (1.0 - cfads_degradation_rate) ** np.arange(
             debt_tenor_years
         )
@@ -133,14 +156,24 @@ def calculate_bankability_metrics(row, assumptions=None):
     else:
         llcr = np.nan
 
+    # DSCR breach years (use yearly if available, otherwise degradation-based)
     if pd.notna(annual_debt_service) and annual_debt_service > 0 and pd.notna(
         target_min_dscr
-    ) and pd.notna(cfads) and debt_tenor_years > 0:
-        cfads_series = cfads * (1.0 - cfads_degradation_rate) ** np.arange(
-            debt_tenor_years
-        )
-        dscr_series = cfads_series / annual_debt_service
-        dscr_breach_years = int(np.sum(dscr_series < target_min_dscr))
+    ):
+        if yearly_revenues is not None and len(yearly_revenues) > 0:
+            yearly_revenues_arr = np.asarray(yearly_revenues, dtype=float)
+            yearly_opex = opex if pd.notna(opex) else 0.0
+            yearly_cfads = yearly_revenues_arr - yearly_opex
+            dscr_series = yearly_cfads / annual_debt_service
+            dscr_breach_years = int(np.sum(dscr_series < target_min_dscr))
+        elif pd.notna(cfads) and debt_tenor_years > 0:
+            cfads_series = cfads * (1.0 - cfads_degradation_rate) ** np.arange(
+                debt_tenor_years
+            )
+            dscr_series = cfads_series / annual_debt_service
+            dscr_breach_years = int(np.sum(dscr_series < target_min_dscr))
+        else:
+            dscr_breach_years = np.nan
     else:
         dscr_breach_years = np.nan
 
@@ -163,8 +196,9 @@ def calculate_bankability_metrics(row, assumptions=None):
         "CFADS degradation rate [-/yr]": cfads_degradation_rate,
         "Debt Amount [MEuro]": debt_amount,
         "Annual Debt Service [MEuro/yr]": annual_debt_service,
-        "DSCR [-]": dscr,
+        "DSCR Min [-]": dscr,
         "DSCR Avg [-]": dscr_avg,
+        "DSCR P90 [-]": dscr_p90,
         "LLCR [-]": llcr,
         "DSCR Breach Years": dscr_breach_years,
         "Debt Headroom [MEuro]": debt_headroom,

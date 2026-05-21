@@ -212,7 +212,8 @@ class finance:
         revenues = revenues.values.flatten()
         outputs["CAPEX"] = CAPEX
         outputs["OPEX"] = OPEX
-        outputs["revenues"] = revenues.mean()
+        outputs["revenues_mean"] = revenues.mean()
+        outputs["revenues_yearly"] = revenues  # Store yearly revenues for bankability calculations
 
         # We need to add DEVEX
         DEVEX = 0
@@ -282,7 +283,8 @@ class finance:
             "NPV_over_CAPEX",
             "mean_AEP",
             "LCOE",
-            "revenues",
+            "revenues_mean",
+            "revenues_yearly",
             "break_even_PPA_price",
         ]
         return [outputs[key] for key in out_keys]
@@ -428,7 +430,8 @@ class finance_comp(ComponentWrapper):
                 ("NPV_over_CAPEX", dict(desc="NPV/CAPEX")),
                 ("mean_AEP", dict(desc="mean AEP")),
                 ("LCOE", dict(desc="LCOE")),
-                ("revenues", dict(desc="Revenues")),
+                ("revenues_mean", dict(desc="Mean revenues")),
+                ("revenues_yearly", dict(desc="Yearly revenues for bankability calculations", shape=[25])),
                 (
                     "break_even_PPA_price",
                     dict(

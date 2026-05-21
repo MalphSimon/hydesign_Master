@@ -96,10 +96,10 @@ def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_p
         else:
             hifiems_dir = os.path.abspath(os.path.join(examples_filepath.rstrip("/").rstrip("\\"), "HiFiEMS_inputs"))
         suffix_map = {
-            "NordsoenMidt": "DKdaOffshore", "Golfe_du_Lion": "FRsdaOffshore", "Sud_Atlantique": "FRwdaOffshore", 
+            "NordsoenMidt": "DKda", "Golfe_du_Lion": "FRsda", "Sud_Atlantique": "FRwda", 
             "Sud_Atlantique_Solar": "FRwda", "Sud_Atlantique_Wind": "FRwda",
-            "Thetys": "NLdaOffshore", "Thetys_Solar": "NLda", "Thetys_Wind": "NLdaOffshore", 
-            "SicilySouth": "ITdaOffshore", "Vestavind": "NOdaOffshore"
+            "Thetys": "NLda", "Thetys_Solar": "NLda", "Thetys_Wind": "NLdae", 
+            "SicilySouth": "ITda", "Vestavind": "NOda"
         }
         suffix = suffix_map.get(base_site_name, "")
         
@@ -165,8 +165,17 @@ def evaluate_single_year(year, parent_temp_dir, site_name, base_site_name, sim_p
         row = eval_df.iloc[0].to_dict()
         row.update({"site": site_name, "weather_year": year, "lifetime_years": lifetime_years, "price_added": price_add})
         
+        # Extract yearly revenues for bankability calculations
+        yearly_revenues = None
+        try:
+            val = hpp.prob.get_val("revenues_yearly")
+            if np.asarray(val).size > 1:
+                yearly_revenues = np.asarray(val, dtype=float).flatten() / 1e6
+        except:
+            pass
+        
         # Calculate bankability metrics and add to row
-        bankability_metrics = calculate_bankability_metrics(row)
+        bankability_metrics = calculate_bankability_metrics(row, yearly_revenues=yearly_revenues)
         row.update(bankability_metrics)
         
         hourly_df = None
@@ -293,7 +302,7 @@ def evaluate_hifiems_site(site_name, start_year, end_year, lifetime_years, price
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--sites", default="Golfe_du_Lion_HiFiEMS, NordsoenMidt_HiFiEMS, SicilySouth_HiFiEMS, Vestavind_HiFiEMS", help="Comma-separated sites")
+    parser.add_argument("--sites", default="SicilySouth_HiFiEMS", help="Comma-separated sites")
     parser.add_argument("--start-year", type=int, default=1982)
     parser.add_argument("--end-year", type=int, default=2015)
     parser.add_argument("--lifetime-years", type=int, default=25)
@@ -305,7 +314,7 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
 
     for site in site_names:
-        csv_path = os.path.join(output_dir, f"{site}_eval_{args.start_year}_{args.end_year}_p{args.price_add}_Offshore.csv")
+        csv_path = os.path.join(output_dir, f"{site}_eval_{args.start_year}_{args.end_year}_p{args.price_add}.csv")
         evaluate_hifiems_site(site, args.start_year, args.end_year, args.lifetime_years, args.price_add, csv_path)
 
 if __name__ == "__main__":

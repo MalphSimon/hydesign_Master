@@ -122,7 +122,7 @@ def _build_ofat_scenarios(scenario_filter: Optional[str] = None) -> List[Scenari
     
     Args:
         scenario_filter: Optional filter to include only specific scenario types.
-                        Options: 'all' (default), 'wind_solar', 'generation', 'costs', 'finance'
+                        Options: 'all' (default), 'wind_solar'/'generation', 'costs', 'finance', 'price'
     
     The baseline scenario is always included first.
     """
@@ -168,8 +168,16 @@ def _build_ofat_scenarios(scenario_filter: Optional[str] = None) -> List[Scenari
         include_opex = False
         include_price = True
         include_generation = False
+    elif scenario_filter.lower() == 'price':
+        # Only electricity price
+        include_capex = False
+        include_wacc = False
+        include_grid = False
+        include_opex = False
+        include_price = True
+        include_generation = False
     else:
-        raise ValueError(f"Unknown scenario filter: {scenario_filter}. Valid options: all, wind_solar, generation, costs, finance")
+        raise ValueError(f"Unknown scenario filter: {scenario_filter}. Valid options: all, wind_solar, generation, costs, finance, price")
     
     if include_capex:
         for lvl in capex_levels:
@@ -193,8 +201,8 @@ def _build_ofat_scenarios(scenario_filter: Optional[str] = None) -> List[Scenari
             scenarios.append(Scenario(f"solar_opex_x{lvl:.2f}", "solar_opex", lvl))
     
     if include_price:
-        # Electricity price: from 1.0 to 2.0 in steps of 0.25
-        for lvl in [1.0, 1.25, 1.5, 1.75, 2.0]:
+        # Electricity price: 0.8 and 1.2 only
+        for lvl in [0.8, 1.2]:
             scenarios.append(Scenario(f"electricity_price_x{lvl:.2f}", "electricity_price", lvl))
     
     if include_generation:
@@ -275,6 +283,8 @@ def _evaluate_scenario_year(
     """
     Worker function to evaluate a single scenario-year combination.
     
+    Handles wind and solar generation sensitivity by creating scaled data files.
+    
     Returns:
         tuple: (result_row, scenario, year) or (None, scenario, year) if failed
     """
@@ -297,13 +307,6 @@ def _evaluate_scenario_year(
         elif scenario.parameter_group == "solar_generation":
             solar_generation_mult = scenario.level
         
-        # Scale wind and solar data in the year dataframe
-        year_df_mod = year_df.copy()
-        if wind_generation_mult != 1.0 and "Windpower_t" in year_df_mod.columns:
-            year_df_mod["Windpower_t"] = year_df_mod["Windpower_t"] * wind_generation_mult
-        if solar_generation_mult != 1.0 and "Solarpower_t" in year_df_mod.columns:
-            year_df_mod["Solarpower_t"] = year_df_mod["Solarpower_t"] * solar_generation_mult
-        
         # Create temporary directory for this evaluation
         with tempfile.TemporaryDirectory(prefix=f"sens_{scenario.scenario_id}_{year}_") as temp_dir:
             # Write scenario-specific YAML
@@ -313,6 +316,50 @@ def _evaluate_scenario_year(
                 tmp_path = tmp.name
             
             try:
+                # Ensure wind/solar file paths are absolute (resolve from examples_filepath if needed)
+                if not os.path.isabs(sim_pars_mod.get("wind_fn", "")):
+                    # Path is relative - resolve from examples_filepath
+                    wind_fn_abs = os.path.join(examples_filepath, sim_pars_mod["wind_fn"])
+                else:
+                    wind_fn_abs = sim_pars_mod["wind_fn"]
+                
+                if not os.path.isabs(sim_pars_mod.get("solar_fn", "")):
+                    # Path is relative - resolve from examples_filepath
+                    solar_fn_abs = os.path.join(examples_filepath, sim_pars_mod["solar_fn"])
+                else:
+                    solar_fn_abs = sim_pars_mod["solar_fn"]
+                
+                # Scale wind and solar data files if needed
+                if wind_generation_mult != 1.0 and "wind_fn" in sim_pars_mod and os.path.isfile(wind_fn_abs):
+                    try:
+                        wind_data = pd.read_csv(wind_fn_abs, index_col=0, parse_dates=False, sep=None, engine="python")
+                        # Scale all numeric columns (catches "Measurement", "Power", etc.)
+                        numeric_cols = wind_data.select_dtypes(include=[np.number]).columns
+                        for col in numeric_cols:
+                            wind_data[col] = wind_data[col] * wind_generation_mult
+                        
+                        # Save scaled wind data to temp directory
+                        wind_fn_scaled = os.path.join(temp_dir, f"Winddata_{year}_scaled.csv")
+                        wind_data.to_csv(wind_fn_scaled)
+                        sim_pars_mod["wind_fn"] = wind_fn_scaled
+                    except Exception as e:
+                        print(f"Warning: Could not scale wind data for {scenario.scenario_id}: {e}")
+                
+                if solar_generation_mult != 1.0 and "solar_fn" in sim_pars_mod and os.path.isfile(solar_fn_abs):
+                    try:
+                        solar_data = pd.read_csv(solar_fn_abs, index_col=0, parse_dates=False, sep=None, engine="python")
+                        # Scale all numeric columns (catches "Measurement", "Power", etc.)
+                        numeric_cols = solar_data.select_dtypes(include=[np.number]).columns
+                        for col in numeric_cols:
+                            solar_data[col] = solar_data[col] * solar_generation_mult
+                        
+                        # Save scaled solar data to temp directory
+                        solar_fn_scaled = os.path.join(temp_dir, f"Solardata_{year}_scaled.csv")
+                        solar_data.to_csv(solar_fn_scaled)
+                        sim_pars_mod["solar_fn"] = solar_fn_scaled
+                    except Exception as e:
+                        print(f"Warning: Could not scale solar data for {scenario.scenario_id}: {e}")
+                
                 _write_yaml(tmp_path, sim_pars_mod)
                 
                 # Call evaluate_single_year
@@ -322,7 +369,7 @@ def _evaluate_scenario_year(
                     site_name=site_name,
                     base_site_name=base_site_name,
                     sim_pars_fn=tmp_path,
-                    year_df=year_df_mod,
+                    year_df=year_df,
                     design=design,
                     lifetime_years=lifetime_years,
                     price_add=price_add,
@@ -408,11 +455,11 @@ def main():
     parser.add_argument(
         "--site",
         nargs='+',
-        default=["Golfe_du_Lion_HiFiEMS"],
+        default=["Sud_Atlantique_HiFiEMS"],
         help="List of HiFiEMS site names (e.g., Golfe_du_Lion_HiFiEMS)",
     )
     parser.add_argument("--start-year", type=int, default=1982)
-    parser.add_argument("--end-year", type=int, default=1982)
+    parser.add_argument("--end-year", type=int, default=2015)
     parser.add_argument(
         "--output-dir",
         default=None,
@@ -421,7 +468,7 @@ def main():
     parser.add_argument(
         "--scenarios",
         default="all",
-        help="Scenario filter: 'all' (default), 'wind_solar'/'generation' (wind+solar generation), 'costs' (capex/opex/grid), 'finance' (wacc/price)",
+        help="Scenario filter: 'all' (default), 'wind_solar'/'generation' (wind+solar generation), 'costs' (capex/opex/grid), 'finance' (wacc/price), 'price' (electricity price only)",
     )
     args = parser.parse_args()
     

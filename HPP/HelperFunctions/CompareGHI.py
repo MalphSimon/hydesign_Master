@@ -64,6 +64,16 @@ for site_name, off_df in offshore_sites.items():
 # --- 5. Generate and Save Hourly Plots ---
 print(f"\nGenerating plots and saving to: {save_path}...")
 
+# Mapping of original names to display names
+site_display_names = {
+    'Golfe_Du_Lion': 'Golfe du Lion (FRs)',
+    'Thetys': 'Thetys (NL)',
+    'NordsoenMidt': 'Nordsøen Midt (DK)',
+    'SicilySouth': 'Sicily South (IT)',
+    'Vestavind': 'Vestavind (NO)',
+    'Sud_Atlantique': 'Sud Atlantique (FRw)'
+}
+
 for site_name, off_df in offshore_sites.items():
     if site_name in onshore_all.columns:
         plt.figure(figsize=(10, 5))
@@ -78,7 +88,9 @@ for site_name, off_df in offshore_sites.items():
         plt.plot(on_hourly.index, on_hourly.values, label='Onshore (Avg)', 
                  color='darkorange', linewidth=2, linestyle='--', marker='x', markersize=4)
         
-        plt.title(f'Mean Diurnal GHI Profile: {site_name}')
+        # Get display name, fallback to original if not in mapping
+        display_name = site_display_names.get(site_name, site_name)
+        plt.title(f'Mean Diurnal GHI Profile: {display_name}')
         plt.xlabel('Hour of Day')
         plt.ylabel('GHI (W/m²)')
         plt.xticks(range(0, 24))

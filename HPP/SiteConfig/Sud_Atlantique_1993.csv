@@ -1,0 +1,55 @@
+,Sud_Atlantique_1993
+clearance [m],27.0
+sp [W/m2],343.0
+p_rated [MW],15.0
+Nwt,0.0
+wind_MW_per_km2 [MW/km2],8.774000000000001
+solar_MW [MW],553.86
+surface_tilt [deg],17.0
+surface_azimuth [deg],180.0
+DC_AC_ratio,1.13345
+b_P [MW],1.3299999999999998
+b_E_h [h],6.090999999999999
+cost_of_battery_P_fluct_in_peak_price_ratio,15.326
+name,Sud_Atlantique_1993
+longitude,-1.7802
+latitude,45.8912
+altitude,100
+NPV_over_CAPEX,-0.5946213244923911
+NPV [MEuro],-369.5667735650482
+IRR,-0.017773225990042163
+LCOE [Euro/MWh],39.77255199787989
+Revenues [MEuro],24.9420165195375
+CAPEX [MEuro],621.516179024584
+OPEX [MEuro],5.963907910152001
+Wind CAPEX [MEuro],0.0
+Wind OPEX [MEuro],0.0
+PV CAPEX [MEuro],306.68418999
+PV OPEX [MEuro],5.9638398615
+Batt CAPEX [MEuro],1.3319890345839123
+Batt OPEX [MEuro],6.804865199999999e-05
+Shared CAPEX [MEuro],313.5
+Shared OPEX [MEuro],0.0
+penalty lifetime [MEuro],0.0
+Mean Annual Electricity Sold [GWh],1286.5420681342212
+GUF,0.29373106578406877
+grid [MW],500.0
+wind [MW],0.0
+solar [MW],553.86
+Battery Energy [MWh],8.101029999999998
+Battery Power [MW],1.3299999999999998
+Total curtailment [GWh],1729.4526810665398
+Total curtailment with deg [GWh],661.7406369204585
+Awpp [km2],0.0
+Apvp [km2],8.86176
+Plant area [km2],8.86176
+Rotor diam [m],235.96828103188196
+Hub height [m],144.98414051594096
+Number of batteries used in lifetime,2.0
+Break-even PPA price [Euro/MWh],41.089889209467266
+Capacity factor wind [-],
+AEP [GWh],1400.3477836902168
+AEP with degradation [GWh],1313.0115340207485
+design obj,NPV_over_CAPEX
+opt time [min],9.41
+n_model_evals,126

@@ -5,8 +5,8 @@
 # The data is hourly from 1982-2015. So plot the hourly avg SP and SP_DA for both files, and also plot the difference between them.
 
 import pandas as pd
-df_offshore = pd.read_csv("C:\\Users\\malth\\HPP\\hydesign\\hydesign\\examples\\Europe\\GWA2\\input_ts_Thetys_DA_Offshore.csv", sep=';')
-df_onshore = pd.read_csv("C:\\Users\\malth\\HPP\\hydesign\\hydesign\\examples\\Europe\\GWA2\\input_ts_Thetys_DA.csv", sep=';')
+df_offshore = pd.read_csv("C:\\Users\\malth\\HPP\\hydesign\\hydesign\\examples\\Europe\\GWA2\\input_ts_Sud_Atlantique_DA_Offshore.csv", sep=';')
+df_onshore = pd.read_csv("C:\\Users\\malth\\HPP\\hydesign\\hydesign\\examples\\Europe\\GWA2\\input_ts_Sud_Atlantique_DA.csv", sep=';')
 
 import matplotlib.pyplot as plt
 # Convert the 'time' column to datetime format

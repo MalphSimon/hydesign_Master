@@ -147,7 +147,7 @@ def save_npv_capex_distribution_boxplot(all_site_data_frames, output_dir):
 
 def save_dscr_distribution_boxplot(all_site_data_frames, output_dir):
     combined_df = pd.concat(all_site_data_frames, ignore_index=True)
-    target_col = _find_column(combined_df, ["DSCR [-]"])
+    target_col = _find_column(combined_df, ["DSCR P90 [-]"])
     if not target_col: return
 
     plt.figure(figsize=(12, 7))
@@ -156,8 +156,8 @@ def save_dscr_distribution_boxplot(all_site_data_frames, output_dir):
     sns.stripplot(data=combined_df, x='site_display', y=target_col, color='black', size=4, jitter=0.15, alpha=0.3)
     plt.xticks(rotation=45, ha='right', fontsize=10)
     plt.xlabel("Site Location", fontweight='bold')
-    plt.ylabel("DSCR [-]", fontweight='bold')
-    plt.title("Distribution of DSCR Across Scenario Years", fontsize=14, fontweight='bold')
+    plt.ylabel("DSCR P90", fontweight='bold')
+    plt.title("Distribution of DSCR P90 Across Scenario Years", fontsize=14, fontweight='bold')
     plt.axhline(1.20, color='red', lw=1.2, ls='--', alpha=0.6, label='Target DSCR (1.20)')
     plt.legend(loc='upper right', frameon=True)
     plt.savefig(os.path.join(output_dir, "DSCR_Distribution_Boxplot_Portfolio.png"), dpi=300, bbox_inches='tight')
@@ -255,6 +255,51 @@ def save_multi_site_dscr_yearly(site_list, input_dir, output_dir):
     
     plt.tight_layout()
     plt.savefig(os.path.join(output_dir, "DSCR_Yearly_Comparison_Portfolio.png"), dpi=300, bbox_inches='tight')
+    plt.close()
+
+def save_multi_site_dscr_p90_yearly(site_list, input_dir, output_dir):
+    fig, ax = plt.subplots(figsize=(15, 8))
+    site_colors = ["#43D1D9", "#4B86C2", "#9C7667", "#68A357", "#D4A373", "#B07BA1"]
+    site_legend_handles = []
+    mean_legend_handles = []
+
+    for idx, site_key in enumerate(site_list):
+        search_pattern = os.path.join(input_dir, f"{site_key}_yearly*.csv")
+        all_files = glob.glob(search_pattern)
+        files = [f for f in all_files if "_hourly" not in f]
+        
+        if not files: continue
+        df = pd.read_csv(files[0])
+        x, labels = _prepare_year_axis(df)
+        color = site_colors[idx % len(site_colors)]
+        display_name = SITE_DISPLAY_MAP.get(site_key, site_key)
+
+        dscr_col = _find_column(df, ["DSCR P90 [-]"])
+        if dscr_col:
+            data = pd.to_numeric(df[dscr_col], errors="coerce")
+            mean_dscr = data.mean()
+            
+            ax.plot(x, data, marker="o", markersize=6, color=color, alpha=0.8, linewidth=2.2, label=display_name)
+            site_legend_handles.append(mlines.Line2D([], [], color=color, marker='o', markersize=8, label=display_name, linewidth=2.2))
+            mean_legend_handles.append(mlines.Line2D([], [], color=color, marker='o', markersize=8, label=f"Mean: {mean_dscr:.2f} %", linewidth=2.2))
+
+    ax.axhline(1.20, color='red', lw=1.5, ls='--', alpha=0.7)
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{int(v) % 100:02d}" if pd.notna(v) else "" for v in pd.to_numeric(labels, errors="coerce")])
+    ax.set_xlabel("Scenario Year", fontweight='bold', fontsize=12)
+    ax.set_ylabel("DSCR P90", fontweight='bold', fontsize=12)
+    ax.set_title("DSCR P90 Yearly Comparison Across Sites", fontsize=16, fontweight='bold', loc='center')
+    ax.grid(True, alpha=0.2, linestyle='--')
+    
+    # Create mean legend in top right corner
+    leg1 = ax.legend(handles=mean_legend_handles, loc='upper right', frameon=True, fontsize=10, labelspacing=1.2)
+    ax.add_artist(leg1)
+    
+    # Create site legend at bottom center
+    ax.legend(handles=site_legend_handles, loc='lower center', ncol=4, bbox_to_anchor=(0.5, -0.15), frameon=True, fontsize=10)
+    
+    plt.tight_layout()
+    plt.savefig(os.path.join(output_dir, "DSCR_P90_Yearly_Comparison_Portfolio.png"), dpi=300, bbox_inches='tight')
     plt.close()
 
 def save_bankability_metrics_table(site_list, input_dir, output_dir):
@@ -503,14 +548,15 @@ def main():
         
         print(f"[Visualizing] Risk-Return and Distributions...")
         #save_npv_distribution_boxplot(processed_dataframes, args.output_dir)
-        save_npv_capex_distribution_boxplot(processed_dataframes, args.output_dir)
+        #save_npv_capex_distribution_boxplot(processed_dataframes, args.output_dir)
         save_dscr_distribution_boxplot(processed_dataframes, args.output_dir)
-        save_multi_site_dscr_yearly(SITES_TO_PLOT, args.input_dir, args.output_dir)
-        save_bankability_metrics_table(SITES_TO_PLOT, args.input_dir, args.output_dir)
+        #save_multi_site_dscr_yearly(SITES_TO_PLOT, args.input_dir, args.output_dir)
+        save_multi_site_dscr_p90_yearly(SITES_TO_PLOT, args.input_dir, args.output_dir)
+        #save_bankability_metrics_table(SITES_TO_PLOT, args.input_dir, args.output_dir)
         #save_bankability_metrics_table_p90(SITES_TO_PLOT, args.input_dir, args.output_dir)
-        save_financial_metrics_table(SITES_TO_PLOT, args.input_dir, args.output_dir)
+        #save_financial_metrics_table(SITES_TO_PLOT, args.input_dir, args.output_dir)
         #save_financial_metrics_table_p90(SITES_TO_PLOT, args.input_dir, args.output_dir)
-        save_multi_site_comparison(SITES_TO_PLOT, args.input_dir, args.output_dir)
+        #save_multi_site_comparison(SITES_TO_PLOT, args.input_dir, args.output_dir)
 
     print(f"Execution Complete. Plots saved to: {os.path.abspath(args.output_dir)}")
 

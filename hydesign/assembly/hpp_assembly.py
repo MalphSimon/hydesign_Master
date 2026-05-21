@@ -861,7 +861,7 @@ class hpp_model(hpp_base):
                 prob["NPV"] / 1e6,
                 prob["IRR"],
                 prob["LCOE"],
-                prob["revenues"] / 1e6,
+                prob["revenues_mean"] / 1e6,
                 prob["CAPEX"] / 1e6,
                 prob["OPEX"] / 1e6,
                 prob.get_val("finance.CAPEX_w") / 1e6,

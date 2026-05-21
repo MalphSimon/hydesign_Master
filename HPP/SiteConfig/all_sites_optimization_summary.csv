@@ -1,2 +1,2 @@
-name,status,error
-Sud_Atlantique_HiFiEMS,failed,All simulations failed during initial DOE. Try narrowing variable bounds or checking model inputs.
+name,site_config_file,NPV_over_CAPEX,NPV [MEuro],LCOE [Euro/MWh],wind [MW],solar [MW],status
+Sud_Atlantique,c:\Users\malth\HPP\hydesign\HPP\SiteConfig\Sud_Atlantique.csv,-0.658842333727671,-409.47337767075805,39.80298093167024,0.0,553.86,ok

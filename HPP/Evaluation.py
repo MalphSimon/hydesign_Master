@@ -431,7 +431,18 @@ def evaluate_single_year(year, site_name, latitude, longitude, altitude, sim_par
         "input_rows_lifetime": len(year_df) * lifetime_years,
     })
     row.update(_extract_mean_annual_generation(hpp, lifetime_years, design["solar_MW"], year_df))
-    row.update(calculate_bankability_metrics(row))
+    
+    # Extract yearly revenues for bankability calculations
+    yearly_revenues = None
+    try:
+        # Try direct access first, then with component path
+        yearly_revenues = _get_prob_var(hpp.prob, ["revenues_yearly", "finance.revenues_yearly"])
+        if yearly_revenues is not None and len(yearly_revenues) > 0:
+            yearly_revenues = np.asarray(yearly_revenues, dtype=float) / 1e6  # Convert to MEuro
+    except Exception as e:
+        print(f"Warning: Could not extract yearly revenues: {e}")
+    
+    row.update(calculate_bankability_metrics(row, yearly_revenues=yearly_revenues))
 
     # Extract hourly time series for export
     wind_t = _get_prob_var(hpp.prob, "wind_t")

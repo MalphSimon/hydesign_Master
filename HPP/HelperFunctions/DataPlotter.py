@@ -1517,7 +1517,7 @@ def plot_normalized_annual_resource_availability(
 
     if save_path:
         os.makedirs(save_path, exist_ok=True)
-        filename = os.path.join(save_path, "annual_indexed_variability_SudAtlantique.png")
+        filename = os.path.join(save_path, "annual_indexed_variability_Golfe_du_Lion.png")
         fig.savefig(filename, dpi=300, bbox_inches="tight")
         print(f"Plot saved to: {filename}")
 
@@ -1819,11 +1819,19 @@ if __name__ == "__main__":
     #plt.close(fig)
 
     # Plot indexed wind, solar and price. 
-    fig, axes = plot_combined_annual_variability_final(
-        site_ids=[8],
-        manual_site_names=["Thetys (NL)"],
+    #fig, axes = plot_combined_annual_variability_final(
+    #    site_ids=[8],
+    #    manual_site_names=["Thetys (NL)"],
+    #    save_path=PLOT_STORAGE_PATH
+    #)   
+    #plt.close(fig)
+
+
+    fig, axes = plot_normalized_annual_resource_availability(
+        site_ids=[13],
+        manual_site_names=["Golfe du Lion (FRs)"],
         save_path=PLOT_STORAGE_PATH
-    )   
+    )
     plt.close(fig)
 
     # Plot 3x2 wind vs price for all sites

@@ -236,10 +236,18 @@ class finance:
 
         penalty_lifetime = df["penalty_t"].sum()
 
+        # Ensure revenues is a numpy array with shape (25,)
+        revenues_array = np.asarray(revenues).flatten()
+        
+        # DEBUG: Print what's being returned
+        import sys
+        print(f"DEBUG finance.compute: revenues_array shape={revenues_array.shape}, values[:3]={revenues_array[:3]}", file=sys.stderr)
+
         return (
             CAPEX,
             OPEX,
             revenues_mean,
+            revenues_array,  # Return yearly revenues array for bankability calculations
             NPV,
             IRR,
             NPV_over_CAPEX,
@@ -274,7 +282,8 @@ class finance_comp(ComponentWrapper):
             outputs=[
                 ("CAPEX", {}),
                 ("OPEX", {}),
-                ("revenues", {}),
+                ("revenues_mean", {}),
+                ("revenues_yearly", {"shape": [25]}),  # Yearly revenues for bankability (25-year lifetime)
                 ("NPV", {}),
                 ("IRR", {}),
                 ("NPV_over_CAPEX", {}),

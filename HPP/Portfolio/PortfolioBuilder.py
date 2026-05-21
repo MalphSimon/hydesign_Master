@@ -51,7 +51,7 @@ COLS_TO_DROP = [
 COLS_TO_AVERAGE = [
     "DC_AC_ratio", "b_E_h [h]", "LCOE [Euro/MWh]", 
     "GUF", "Break-even PPA price [Euro/MWh]", 
-    "Capacity factor wind [-]", "Capacity factor solar [-]", "DSCR Breach Years", "DSCR [-]"
+    "Capacity factor wind [-]", "Capacity factor solar [-]", "DSCR Breach Years", "DSCR [-]", "DSCR P90 [-]"
 ]
 
 # ---------------------------------------------------------------------------
